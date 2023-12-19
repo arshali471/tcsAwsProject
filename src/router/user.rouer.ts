@@ -16,6 +16,7 @@ export default class UserRouter {
         
         // POST
         this.router.post("/createUser", Validate(UserSchema), UserController.createUser); 
+        this.router.post("/login", Validate(UserSchema), UserController.login); 
 
         // PUT
     }
