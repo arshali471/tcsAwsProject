@@ -1,7 +1,5 @@
 import express from "express";
-import { EC2Client, DescribeInstancesCommand } from "@aws-sdk/client-ec2";
 import { DateTime } from "luxon";
-import { CONFIG } from "../config/environment";
 import { S3BucketService } from "../services/awsS3Service";
 import { EC2InstanceService } from "../services/awsEC2Service";
 
@@ -9,7 +7,8 @@ import { EC2InstanceService } from "../services/awsEC2Service";
 export class AwsController {
     static async getAllInstance(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
-            const data = await EC2InstanceService.getAllInstanceDetails(); 
+            const keyId = req.params.keyId; 
+            const data = await EC2InstanceService.getAllInstanceDetails(keyId); 
             res.status(200).json(data);
         } catch (err) {
             next(err);
@@ -18,8 +17,9 @@ export class AwsController {
 
     static async getInstanceDetailsByInstanceId(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
+            const keyId = req.params.keyId;
             const instanceId = req.params.instanceId; 
-            const data = await EC2InstanceService.getInstanceDetailsByInstanceId(instanceId); 
+            const data = await EC2InstanceService.getInstanceDetailsByInstanceId(instanceId, keyId); 
             res.status(200).json(data);
         } catch (err) {
             next(err);
@@ -28,8 +28,6 @@ export class AwsController {
 
     static async getS3Bucket(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
-
-            // Call the function and log the results
             await S3BucketService.getBucketDetails().then((bucketDetails: any) => {
                 const formattedDetails = bucketDetails.map((bucket: any) => ({
                     ...bucket,

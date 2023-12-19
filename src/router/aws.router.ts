@@ -12,8 +12,8 @@ export default class AwsRouter {
     public routes(): void {
         // GET
         // EC2
-        this.router.get('/getAllInstance', AwsController.getAllInstance);
-        this.router.get("/getInstanceDetailsByInstanceId/:instanceId", AwsController.getInstanceDetailsByInstanceId)
+        this.router.get('/getAllInstance/:keyId', AwsController.getAllInstance);
+        this.router.get("/getInstanceDetailsByInstanceId/:instanceId/:keyId", AwsController.getInstanceDetailsByInstanceId)
         
         // S3
         this.router.get("/getS3Bucket", AwsController.getS3Bucket)

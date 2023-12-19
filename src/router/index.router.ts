@@ -1,7 +1,7 @@
 import express, { NextFunction, Request, Response } from 'express';
 import { IServer } from '../lib/interfaces';
 import AwsRouter from './aws.router';
-// import ApikeyRouter from './apikey.router';
+import AwsKeysRouter from './awsKeys.router';
 
 export default class Routes {
 
@@ -27,6 +27,7 @@ export default class Routes {
         // apikey
         // server.app.use('/api/v1/apikey', new ApikeyRouter().router);
         server.app.use("/api/v1/aws", new AwsRouter().router); 
+        server.app.use("/api/v1/awsKey", new AwsKeysRouter().router); 
 
 
     }

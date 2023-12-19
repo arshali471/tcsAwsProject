@@ -1,17 +1,13 @@
 import { EC2Client, DescribeInstancesCommand } from "@aws-sdk/client-ec2";
 import { CONFIG } from "../config/environment";
+import { AWSKeyService } from "./awsKeyService";
 
-const awsConfig: any = {
-    region: CONFIG.aws.region,
-    credentials: {
-        accessKeyId: CONFIG.aws.accessKeyId, // Replace with your access key id
-        secretAccessKey: CONFIG.aws.secretAccessKey // Replace with your secret access key
-    }
-};
+
 
 export class EC2InstanceService {
-    static async getAllInstanceDetails() {
+    static async getAllInstanceDetails(keyId: any) {
         try {
+            const awsConfig = await AWSKeyService.getAWSKeyById(keyId); 
             const ec2Client = new EC2Client(awsConfig);
             // Create an EC2 service object
             const data = await ec2Client.send(new DescribeInstancesCommand({}));
@@ -22,11 +18,12 @@ export class EC2InstanceService {
         }
     }
 
-    static async getInstanceDetailsByInstanceId(instanceId: any) {
+    static async getInstanceDetailsByInstanceId(instanceId: any, keyId: any) {
         try {
             const params = {
                 InstanceIds: [instanceId]
             };
+            const awsConfig = await AWSKeyService.getAWSKeyById(keyId); 
             const ec2Client = new EC2Client(awsConfig);
             const command = new DescribeInstancesCommand(params);
             const response: any = await ec2Client.send(command);
