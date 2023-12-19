@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { AwsController } from '../controllers/awsController';
+import { authMiddleware } from '../middleware/AuthMiddleware';
 
 export default class AwsRouter {
     public router: Router;
@@ -12,11 +13,11 @@ export default class AwsRouter {
     public routes(): void {
         // GET
         // EC2
-        this.router.get('/getAllInstance/:keyId', AwsController.getAllInstance);
-        this.router.get("/getInstanceDetailsByInstanceId/:instanceId/:keyId", AwsController.getInstanceDetailsByInstanceId)
+        this.router.get('/getAllInstance/:keyId', authMiddleware(), AwsController.getAllInstance);
+        this.router.get("/getInstanceDetailsByInstanceId/:instanceId/:keyId", authMiddleware(), AwsController.getInstanceDetailsByInstanceId)
         
         // S3
-        this.router.get("/getS3Bucket", AwsController.getS3Bucket)
+        this.router.get("/getS3Bucket", authMiddleware(), AwsController.getS3Bucket)
         // POST
 
         // PUT

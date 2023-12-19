@@ -8,4 +8,8 @@ export class UserDao {
     static async getUserByUsername(username: string) {
         return await userModel.findOne({username})
     }
+
+    static async getUserById(id: any) {
+        return await userModel.findById(id); 
+    }
 }

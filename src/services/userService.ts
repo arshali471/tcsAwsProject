@@ -10,6 +10,10 @@ export class UserService {
     static async getUserByUsername(username: string) {
         return await UserDao.getUserByUsername(username); 
     }
+
+    static async getUserById(id: any) {
+        return await UserDao.getUserById(id); 
+    }
 }
 
 
