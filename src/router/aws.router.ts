@@ -17,7 +17,7 @@ export default class AwsRouter {
         this.router.get("/getInstanceDetailsByInstanceId/:instanceId/:keyId", authMiddleware(), AwsController.getInstanceDetailsByInstanceId)
         
         // S3
-        this.router.get("/getS3Bucket", authMiddleware(), AwsController.getS3Bucket)
+        this.router.get("/getS3Bucket/:keyId", authMiddleware(), AwsController.getS3Bucket)
         // POST
 
         // PUT

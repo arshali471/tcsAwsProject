@@ -2,22 +2,16 @@ import { S3Client, ListBucketsCommand, GetBucketLocationCommand } from "@aws-sdk
 import { CloudWatchClient, GetMetricDataCommand } from "@aws-sdk/client-cloudwatch";
 
 import { CONFIG } from "../config/environment";
-
-const awsConfig: any = {
-    region: CONFIG.aws.region,
-    credentials: {
-        accessKeyId: CONFIG.aws.accessKeyId, // Replace with your access key id
-        secretAccessKey: CONFIG.aws.secretAccessKey // Replace with your secret access key
-    }
-};
-
-// Initialize the S3 and CloudWatch clients
-const s3Client = new S3Client(awsConfig);
-const cloudWatchClient = new CloudWatchClient(awsConfig);
+import { AWSKeyService } from "./awsKeyService";
 
 export class S3BucketService {
-    static async getBucketDetails() {
+    static async getBucketDetails(keyId: any) {
         try {
+            const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
+
+            // Initialize the S3 and CloudWatch clients
+            const s3Client = new S3Client(awsConfig);
+            const cloudWatchClient = new CloudWatchClient(awsConfig);
             const bucketsData = await s3Client.send(new ListBucketsCommand({}));
             const buckets: any = bucketsData.Buckets;
 
