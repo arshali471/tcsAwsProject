@@ -23,5 +23,10 @@ export const CONFIG = {
     cookie: {
         secret: "@#$@#4knshdf82#9382yrknjef9@#$"
     },
+    aws: {
+        region: process.env.region,
+        accessKeyId: process.env.accessKeyId,
+        secretAccessKey: process.env.secretAccessKey
+    },
     uploadsFolderPath: path.resolve(__dirname, '../../uploads')
 }
