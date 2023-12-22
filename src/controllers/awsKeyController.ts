@@ -5,6 +5,11 @@ import { AWSKeyService } from "../services/awsKeyService";
 export class AwsKeyController {
     static async createAWSKey(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
+            const user = req.user; 
+            if (!user.addAWSKey) {
+                return res.status(400).send("User not allowed to add AWS Key.")
+            }
+            
             const keyData = req.body; 
 
             const createdAwsKey = await AWSKeyService.createAWSKey(keyData); 

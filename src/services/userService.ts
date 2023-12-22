@@ -14,6 +14,22 @@ export class UserService {
     static async getUserById(id: any) {
         return await UserDao.getUserById(id); 
     }
+
+    static async getAllUser() {
+        return await UserDao.getAllUser();
+    }
+
+    static async updateUser(userId: any, payload: any) {
+        return await UserDao.updateUser(userId, payload); 
+    }
+
+    static async deleteUser(userId: any) {
+        return await UserDao.deleteUser(userId); 
+    }
+
+    static async getUsers(searchText: string) {
+        return await UserDao.getUsers(searchText); 
+    }
 }
 
 

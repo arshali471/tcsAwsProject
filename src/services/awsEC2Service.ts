@@ -10,8 +10,11 @@ export class EC2InstanceService {
             const awsConfig = await AWSKeyService.getAWSKeyById(keyId); 
             const ec2Client = new EC2Client(awsConfig);
             // Create an EC2 service object
-            const data = await ec2Client.send(new DescribeInstancesCommand({}));
-            return data;
+            const data: any = await ec2Client.send(new DescribeInstancesCommand({}));
+            const intances = data.Reservations.map((data: any) => {
+                return data.Instances[0]
+            })
+            return intances;
         } catch (err) {
             console.error("Error fetching bucket details:", err);
             throw err;

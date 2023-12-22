@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { Validate } from '../lib/validations/validate';
 import { UserController } from '../controllers/userController';
-import { UserSchema } from '../lib/validations/user.schema';
+import { UserLoginSchema, UserSchema, UserUpdateSchema } from '../lib/validations/user.schema';
+import { adminAuthMiddleware } from '../middleware/AdminAuthMiddleware';
 
 export default class UserRouter {
     public router: Router;
@@ -13,11 +14,17 @@ export default class UserRouter {
 
     public routes(): void {
         // GET
+        this.router.get("/getAllUser", adminAuthMiddleware(), UserController.getAllUser)
+        this.router.get("/searchUser", adminAuthMiddleware(), UserController.getUsers); 
         
         // POST
-        this.router.post("/createUser", Validate(UserSchema), UserController.createUser); 
-        this.router.post("/login", Validate(UserSchema), UserController.login); 
+        this.router.post("/createUser", adminAuthMiddleware(), Validate(UserSchema), UserController.createUser); 
+        this.router.post("/login", Validate(UserLoginSchema), UserController.login); 
 
         // PUT
+        this.router.put("/updateUser/:id", adminAuthMiddleware(), Validate(UserUpdateSchema), UserController.updateUser);
+
+        // DELETE
+        this.router.delete("/deleteUser/:id", adminAuthMiddleware(), UserController.deleteUser)
     }
 }

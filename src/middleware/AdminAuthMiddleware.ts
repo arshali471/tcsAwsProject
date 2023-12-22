@@ -6,7 +6,7 @@ import { throwError } from '../util/util';
 
 
 
-export function authMiddleware() {
+export function adminAuthMiddleware() {
     return async function (req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
 
@@ -26,6 +26,10 @@ export function authMiddleware() {
 
             if (!user.isActive) {
                 return res.status(404).send("user not allowed.")
+            }
+
+            if (!user.admin && !user.addUser) {
+                return res.status(404).send("user not allowed to create user.")
             }
 
             req.user = user;

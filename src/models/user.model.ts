@@ -4,6 +4,9 @@ export interface IUser extends Document {
     username: string
     password: string
     isActive: boolean
+    admin: boolean
+    addUser: boolean
+    addAWSKey: boolean
 }
 
 const UserSchema = new Schema<IUser>({
@@ -12,6 +15,18 @@ const UserSchema = new Schema<IUser>({
     isActive: {
         type: Boolean, 
         default: true
+    }, 
+    admin: {
+        type: Boolean, 
+        default: false
+    }, 
+    addUser: {
+        type: Boolean, 
+        default: false
+    }, 
+    addAWSKey: {
+        type: Boolean, 
+        default: false
     }
 },
     {

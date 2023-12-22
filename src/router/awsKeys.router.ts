@@ -14,10 +14,10 @@ export default class AwsKeysRouter {
 
     public routes(): void {
         // GET
-        this.router.get('/getAllAWSKey', authMiddleware(), AwsKeyController.getAllAWSKey);
+        this.router.get('/getAllAWSKey', authMiddleware(), authMiddleware(), AwsKeyController.getAllAWSKey);
         
         // POST
-        this.router.post("/createAWSKey", Validate(AWSKeySchema), AwsKeyController.createAWSKey); 
+        this.router.post("/createAWSKey", authMiddleware(), Validate(AWSKeySchema), AwsKeyController.createAWSKey); 
 
         // PUT
     }
