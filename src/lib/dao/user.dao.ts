@@ -18,12 +18,13 @@ export class UserDao {
     }
 
     static async updateUser(userId: any, payload: any) {
+        const user: any = await userModel.findById({_id: userId}); 
         return await userModel.findByIdAndUpdate({ _id: userId }, {
             $set: {
-                isActive: payload.isActive, 
-                admin: payload.admin, 
-                addUser: payload.addUser, 
-                addAWSKey: payload.addAWSKey
+                isActive: payload.isActive  !== undefined ? payload.isActive : user.isActive, 
+                admin: payload.admin !== undefined ? payload.admin : user.admin , 
+                addUser: payload.addUser !== undefined ? payload.addUser : user.addUser, 
+                addAWSKey: payload.addAWSKey !== undefined ? payload.addAWSKey : user.addAWSKey
             }
         }, { new: true }).select("-password")
     }

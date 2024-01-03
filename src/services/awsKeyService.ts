@@ -26,6 +26,14 @@ export class AWSKeyService {
         };
         return awsConfig; 
     } 
+
+    static async updateApiKey(payload: any, id: any) {
+        return await AWSKeyDao.updateApiKey(payload, id); 
+    }
+
+    static async deleteAWSKey(id: any) {
+        return await AWSKeyDao.deleteAWSKey(id); 
+    }
 }
 
 

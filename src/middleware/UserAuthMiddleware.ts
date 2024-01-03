@@ -6,7 +6,7 @@ import { throwError } from '../util/util';
 
 
 
-export function adminAuthMiddleware() {
+export function userAuthMiddleware() {
     return async function (req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
 
@@ -28,8 +28,8 @@ export function adminAuthMiddleware() {
                 return res.status(404).send("user not allowed.")
             }
 
-            if (!user.admin) {
-                return res.status(404).send("User not allowed to perform this task. Please contact admin.")
+            if (!user.addAWSKey && !user.addUser) {
+                return res.status(404).send("user not allowed to perform this task. Please contact admin.")
             }
 
             req.user = user;

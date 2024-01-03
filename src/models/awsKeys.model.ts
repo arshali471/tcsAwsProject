@@ -7,6 +7,7 @@ export interface IAWSKey extends Document {
     secretAccessKey: string
     enviroment: string
     createdBy: Schema.Types.ObjectId; 
+    updatedBy: Schema.Types.ObjectId; 
 }
 
 const AWSKeySchema = new Schema<IAWSKey>({
@@ -18,6 +19,10 @@ const AWSKeySchema = new Schema<IAWSKey>({
     secretAccessKey: String, 
     enviroment: String, 
     createdBy: {
+        type: Schema.Types.ObjectId, 
+        ref: "user"
+    }, 
+    updatedBy: {
         type: Schema.Types.ObjectId, 
         ref: "user"
     }

@@ -3,6 +3,8 @@ import { Validate } from '../lib/validations/validate';
 import { UserController } from '../controllers/userController';
 import { UserLoginSchema, UserSchema, UserUpdateSchema } from '../lib/validations/user.schema';
 import { adminAuthMiddleware } from '../middleware/AdminAuthMiddleware';
+import { authMiddleware } from '../middleware/AuthMiddleware';
+import { userAuthMiddleware } from '../middleware/UserAuthMiddleware';
 
 export default class UserRouter {
     public router: Router;
@@ -14,11 +16,12 @@ export default class UserRouter {
 
     public routes(): void {
         // GET
-        this.router.get("/getAllUser", adminAuthMiddleware(), UserController.getAllUser)
+        this.router.get("/getAllUser", userAuthMiddleware(), UserController.getAllUser)
+        this.router.get("/getUserById", authMiddleware(), UserController.getUserById)
         this.router.get("/searchUser", adminAuthMiddleware(), UserController.getUsers); 
         
         // POST
-        this.router.post("/createUser", adminAuthMiddleware(), Validate(UserSchema), UserController.createUser); 
+        this.router.post("/createUser", userAuthMiddleware(), Validate(UserSchema), UserController.createUser); 
         this.router.post("/login", Validate(UserLoginSchema), UserController.login); 
 
         // PUT

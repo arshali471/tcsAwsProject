@@ -6,12 +6,12 @@ import { Utility, throwError } from "../util/util";
 export class UserController {
     static async createUser(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
-            let { username, password, admin, addUser, addAWSKey  } = req.body;
+            let { username, password, admin, addUser, addAWSKey } = req.body;
 
             password = await Utility.createPasswordHash(password);
 
-            const user = await UserService.getUserByUsername(username); 
-            
+            const user = await UserService.getUserByUsername(username);
+
             if (user) {
                 return res.status(404).send("User already present with same username.")
             }
@@ -42,7 +42,7 @@ export class UserController {
             let token = Utility.generateJwtToken(user?._id);
 
             res.send({
-                token, 
+                token,
                 username: user.username
             });
         } catch (err) {
@@ -54,7 +54,20 @@ export class UserController {
         try {
             const userData = await UserService.getAllUser();
             if (!userData) {
-                return res.status(404).send("User not created.")
+                return res.status(404).send("User not found")
+            }
+            res.send(userData);
+        } catch (err) {
+            next(err);
+        }
+    }
+
+    static async getUserById(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const id = req.user._id;
+            const userData = await UserService.getUserById(id);
+            if (!userData) {
+                return res.status(404).send("User not found.")
             }
             res.send(userData);
         } catch (err) {
@@ -64,8 +77,19 @@ export class UserController {
 
     static async updateUser(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
-            const userId = req.params.id; 
-            const data = req.body; 
+            const userId = req.params.id;
+            let data = req.body;
+
+            if (data.admin) {
+                data = {
+                    admin: true,
+                    addUser: true,
+                    addAWSKey: true,
+                }
+            }
+
+            console.log(data, "data")
+
             const userData = await UserService.updateUser(userId, data);
             if (!userData) {
                 return res.status(404).send("User not updated.")
@@ -78,7 +102,7 @@ export class UserController {
 
     static async deleteUser(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
-            const userId = req.params.id; 
+            const userId = req.params.id;
             const userData = await UserService.deleteUser(userId);
             if (!userData) {
                 return res.status(404).send("User not deleted.")
@@ -91,7 +115,7 @@ export class UserController {
 
     static async getUsers(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
-            const searchText: any = req.query.searchText; 
+            const searchText: any = req.query.searchText;
 
             const userData = await UserService.getUsers(searchText);
             if (!userData) {
