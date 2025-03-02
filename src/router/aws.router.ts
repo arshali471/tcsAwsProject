@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AwsController } from '../controllers/awsController';
 import { authMiddleware } from '../middleware/AuthMiddleware';
+import { AwsEKSController } from '../controllers/awsEKSController';
 
 export default class AwsRouter {
     public router: Router;
@@ -21,5 +22,8 @@ export default class AwsRouter {
         // POST
 
         // PUT
+
+        // EKS
+        this.router.get("/getEksCluster/:keyId", authMiddleware(), AwsEKSController.getEksCluster)
     }
 }

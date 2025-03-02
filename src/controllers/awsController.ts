@@ -29,16 +29,19 @@ export class AwsController {
     static async getS3Bucket(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
             const keyId = req.params.keyId;
-            await S3BucketService.getBucketDetails(keyId).then((bucketDetails: any) => {
-                const formattedDetails = bucketDetails.map((bucket: any) => ({
-                    ...bucket,
-                    creationDate: bucket.creationDate ? DateTime.fromJSDate(bucket.creationDate).toISODate() : 'Unknown',
-                    size: `${(bucket.size / 1024 / 1024).toFixed(2)} MB` // Convert bytes to MB
-                }));
-                res.send(formattedDetails); 
-            }).catch(err => {
-                console.error(err);
-            });
+            await S3BucketService.getBucketDetails(keyId)
+                .then((bucketDetails: any) => {
+                    const formattedDetails = bucketDetails.map((bucket: any) => ({
+                        ...bucket,
+                        creationDate: bucket.creationDate ? DateTime.fromJSDate(bucket.creationDate).toISODate() : 'Unknown',
+                        size: `${(bucket.size / 1024 / 1024 / 1024).toFixed(2)} GB` // Convert bytes to GB
+                    }));
+                    res.send(formattedDetails);
+                })
+                .catch(err => {
+                    console.error(err);
+                    next(err);
+                });
         } catch (err) {
             next(err);
         }

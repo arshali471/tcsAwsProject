@@ -1,2 +1,2 @@
-export * from "./awsKeys.model"; 
-export * from "./user.model"; 
+export * from "./awsKeys.model";
+export * from "./user.model";
