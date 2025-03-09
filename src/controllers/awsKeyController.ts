@@ -26,7 +26,7 @@ export class AwsKeyController {
 
     static async getAllAWSKey(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
-            const awsKeys = await AWSKeyService.getAllAWSKey(); 
+            const awsKeys = await AWSKeyService.getAllAWSKey();
             res.status(200).send(awsKeys);
         } catch (err) {
             next(err);
@@ -44,11 +44,11 @@ export class AwsKeyController {
             const keyData = req.body; 
             keyData.updatedBy = user._id; 
 
-            const createdAwsKey = await AWSKeyService.updateApiKey(keyData, id); 
+            const createdAwsKey = await AWSKeyService.updateApiKey(keyData, id);
             if (!createdAwsKey) {
                 return res.status(404).send("AWS Key data not created.")
             }
-            res.status(200).send(createdAwsKey);
+            res.status(200).send("Key updated successfully.");
         } catch (err) {
             next(err);
         }

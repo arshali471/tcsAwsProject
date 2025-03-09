@@ -6,11 +6,15 @@ export class AWSKeyDao {
     }
 
     static async getAllAWSKey() {
-        return await awsKeysModel.find({}).populate("createdBy updatedBy", "username");
+        return await awsKeysModel.find({}, "-secretAccessKey").populate("createdBy updatedBy", "username");
     }
 
     static async getAWSKeyById(keyId: any) {
         return await awsKeysModel.findById({ _id: keyId });
+    }
+
+    static async getAWSKeyAccessKeyById(keyId: any) {
+        return await awsKeysModel.findById({ _id: keyId }, "-secretAccessKey");
     }
 
     static async updateApiKey(payload: any, id: any) {

@@ -10,7 +10,7 @@ export class UserDao {
     }
 
     static async getUserById(id: any) {
-        return await userModel.findById(id);
+        return await userModel.findById(id, "-password");
     }
 
     static async getAllUser() {
@@ -30,11 +30,7 @@ export class UserDao {
     }
 
     static async deleteUser(userId: any) {
-        return await userModel.findByIdAndUpdate({ _id: userId }, {
-            $set: {
-                isActive: false, 
-            }
-        }, { new: true }).select("-password")
+        return await userModel.findOneAndDelete({ _id: userId });
     }
 
     static async getUsers(searchText: any) {
