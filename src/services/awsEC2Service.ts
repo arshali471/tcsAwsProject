@@ -1,6 +1,7 @@
 import { EC2Client, DescribeInstancesCommand } from "@aws-sdk/client-ec2";
 import { CONFIG } from "../config/environment";
 import { AWSKeyService } from "./awsKeyService";
+import { EC2Dao } from "../lib/dao/ec2.dao";
 
 
 
@@ -35,6 +36,14 @@ export class EC2InstanceService {
             console.error("Error fetching EC2 instance details:", err);
             throw err;
         } 
+    }
+
+    static async saveInstanceDetails(data: any) {
+        return await EC2Dao.saveInstancesDetails(data);
+    }
+
+    static async getInstancesByDate(date: string) {
+        return await EC2Dao.getInstancesByDate(date);
     }
 }
 
