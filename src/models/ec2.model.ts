@@ -116,6 +116,7 @@ export interface IEC2 extends Document {
         AutoRecovery: string;
     };
     CurrentInstanceBootMode: string;
+    environment: string
 }
 
 const EC2Schema = new Schema<IEC2>({
@@ -234,6 +235,7 @@ const EC2Schema = new Schema<IEC2>({
         AutoRecovery: String,
     },
     CurrentInstanceBootMode: String,
+    environment: String
 },
 {
     versionKey: false,

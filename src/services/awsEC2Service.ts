@@ -8,7 +8,7 @@ import { EC2Dao } from "../lib/dao/ec2.dao";
 export class EC2InstanceService {
     static async getAllInstanceDetails(keyId: any) {
         try {
-            const awsConfig = await AWSKeyService.getAWSKeyById(keyId); 
+            const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
             const ec2Client = new EC2Client(awsConfig);
             // Create an EC2 service object
             const data: any = await ec2Client.send(new DescribeInstancesCommand({}));
@@ -38,12 +38,12 @@ export class EC2InstanceService {
         } 
     }
 
-    static async saveInstanceDetails(data: any) {
-        return await EC2Dao.saveInstancesDetails(data);
+    static async saveInstanceDetails(data: any, environment: any) {
+        return await EC2Dao.saveInstancesDetails(data, environment);
     }
 
-    static async getInstancesByDate(date: string) {
-        return await EC2Dao.getInstancesByDate(date);
+    static async getInstancesByDate(date: string, environment: string) {
+        return await EC2Dao.getInstancesByDate(date, environment);
     }
 }
 

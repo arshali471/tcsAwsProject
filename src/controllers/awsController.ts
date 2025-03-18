@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 import { S3BucketService } from "../services/awsS3Service";
 import { EC2InstanceService } from "../services/awsEC2Service";
 import { AWSStatusCheckService } from "../services/awsEC2StatusCheckService";
+import { AWSKeyService } from "../services";
 
 
 export class AwsController {
@@ -10,30 +11,32 @@ export class AwsController {
         try {
             const keyId = req.params.keyId;
             const query = String(req.query.query) || req.query;
+            const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
+            const environment = String(awsConfig.enviroment);
             if (query === "api") {
                 const data = await EC2InstanceService.getAllInstanceDetails(keyId);
                 return res.status(200).json({data, message: "Data fetched from API"});
             } else if (query === "db") {
                 const date = String(req.query.date);
-                const data = await EC2InstanceService.getInstancesByDate(date);
+
+                const data = await EC2InstanceService.getInstancesByDate(date, environment);
                 return res.status(200).json({data, message: "Data fetched from DB"});
             } else if (query === "api-save-db") {
                 const data = await EC2InstanceService.getAllInstanceDetails(keyId);
-                const saveData = await EC2InstanceService.saveInstanceDetails(data);
-                return res.status(200).json({saveData, message: "Fetched from API and Data saved to DB"});
+                // return res.status(200).json({data, message: "Data fetched from API"});
+                const enviromentData = data.map((item: any) => {
+                    return {
+                        ...item,
+                        environment: environment
+                    }
+                })
+                console.log(enviromentData.environment, environment , "enviroment")
+
+                const saveData = await EC2InstanceService.saveInstanceDetails(enviromentData, environment);
+                return res.status(200).json({data: saveData, message: "Fetched from API and Data saved to DB"});
             }
 
             res.status(200).json("please provide valide query");
-        } catch (err) {
-            next(err);
-        }
-    }
-
-    static async getInstancesByDate(req: express.Request, res: express.Response, next: express.NextFunction) {
-        try {
-            const date = String(req.query.date);
-            const data = await EC2InstanceService.getInstancesByDate(date);
-            res.status(200).json(data);
         } catch (err) {
             next(err);
         }

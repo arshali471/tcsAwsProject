@@ -22,7 +22,8 @@ export class AWSKeyService {
             credentials: {
                 accessKeyId: keyData.accessKeyId, // Replace with your access key id
                 secretAccessKey: keyData.secretAccessKey // Replace with your secret access key
-            }
+            },
+            enviroment: keyData.enviroment
         };
         return awsConfig; 
     } 
