@@ -36,7 +36,7 @@ export class Utility {
                 id: userUUID,
             },
             CONFIG.jwt.secret,
-            { expiresIn: "10m" }
+            { expiresIn: "1h" }
         );
     }
 }

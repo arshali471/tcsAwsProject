@@ -12,7 +12,7 @@ export class UserService {
     }
 
     static async getUserById(id: any) {
-        return await UserDao.getUserById(id); 
+        return await UserDao.getUserById(id);
     }
 
     static async getAllUser() {
@@ -20,7 +20,7 @@ export class UserService {
     }
 
     static async updateUser(userId: any, payload: any) {
-        return await UserDao.updateUser(userId, payload); 
+        return await UserDao.updateUser(userId, payload);
     }
 
     static async deleteUser(userId: any) {
@@ -29,6 +29,14 @@ export class UserService {
 
     static async getUsers(searchText: string) {
         return await UserDao.getUsers(searchText); 
+    }
+
+    static async changePassword(userId: any, password: any) {
+        return await UserDao.changePassword(userId, password);
+    }
+
+    static async getUserPassword(userId: any) {
+        return await UserDao.getUserPassword(userId);
     }
 }
 

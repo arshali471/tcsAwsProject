@@ -40,4 +40,16 @@ export class UserDao {
             ]
         })
     }
+
+    static async changePassword(userId: any, password: any) {
+        return await userModel.findByIdAndUpdate({ _id: userId }, {
+            $set: {
+                password: password
+            }
+        }, { new: true }).select("-password")
+    }
+
+    static async getUserPassword(userId: any) {
+        return await userModel.findById(userId, "password");
+    }
 }

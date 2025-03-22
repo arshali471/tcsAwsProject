@@ -64,6 +64,8 @@ export class AWSEKSService {
                     nodes: nodesDetails,
                     logging: cluster.logging?.clusterLogging || [],
                     encryption: cluster.encryptionConfig || [],
+                    token: "token",
+                    connectUrl: "https://google.com",
                 };
             }));
 

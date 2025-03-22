@@ -126,4 +126,46 @@ export class UserController {
             next(err);
         }
     }
+
+    static async changePassword(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const userId = req.user.id;
+            let { newPassword, currentPassword } = req.body;
+            newPassword = await Utility.createPasswordHash(newPassword);
+
+            const user = await UserService.getUserPassword(userId);
+            if (!user) {
+                return res.status(404).send("User not found.")
+            }
+
+            if (!Utility.comparePasswordHash(user.password, currentPassword)) {
+                throwError("password does not match", 400);
+            }
+
+            console.log(newPassword, "newPassword")
+            const userData = await UserService.changePassword(userId, newPassword);
+            if (!userData) {
+                return res.status(404).send("User not updated.")
+            }
+            res.send(userData);
+        } catch (err) {
+            next(err);
+        }
+    }
+
+    static async changePasswordByAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const userId = req.params.id;
+            let { newPassword } = req.body;
+            newPassword = await Utility.createPasswordHash(newPassword);
+
+            const userData = await UserService.changePassword(userId, newPassword);
+            if (!userData) {
+                return res.status(404).send("User not updated.")
+            }
+            res.send(userData);
+        } catch (err) {
+            next(err);
+        }
+    }
 }   
