@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/AuthMiddleware';
 import { AwsEKSController } from '../controllers/awsEKSController';
 import { AwsRDSController } from '../controllers/awsRDSController';
 import { AwsVolumesController } from '../controllers/awsVolumesController';
+import { adminAuthMiddleware } from '../middleware/AdminAuthMiddleware';
 
 export default class AwsRouter {
     public router: Router;
@@ -34,6 +35,8 @@ export default class AwsRouter {
 
         // EKS
         this.router.get("/getEksCluster/:keyId", authMiddleware(), AwsEKSController.getEksCluster)
+        this.router.post("/addEKSToken", adminAuthMiddleware(), AwsEKSController.addEKSToken)
+        this.router.put("/updateEKSToken/:id", adminAuthMiddleware(), AwsEKSController.updateEKSToken)
 
 
         // RDS

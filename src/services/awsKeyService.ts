@@ -12,7 +12,7 @@ export class AWSKeyService {
     }
 
     static async getAWSKeyById(keyId: any) {
-        const keyData: any = await AWSKeyDao.getAWSKeyById(keyId); 
+        const keyData: any = await AWSKeyDao.getAWSKeyById(keyId);
         if (!keyData) {
             throwError("no key found", 404); 
         }
@@ -25,7 +25,7 @@ export class AWSKeyService {
             },
             enviroment: keyData.enviroment
         };
-        return awsConfig; 
+        return awsConfig;
     } 
 
     static async updateApiKey(payload: any, id: any) {

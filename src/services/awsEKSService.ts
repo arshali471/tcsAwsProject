@@ -3,6 +3,7 @@ import {
     ListNodegroupsCommand, DescribeNodegroupCommand 
 } from "@aws-sdk/client-eks";
 import { AWSKeyService } from "./awsKeyService";// Fetch AWS credentials
+import { EksDashboardDao } from "../lib/dao/eksDashboard.dao";
 
 export class AWSEKSService {
     static async getAllEKSClusterDetails(keyId: any) {
@@ -49,6 +50,8 @@ export class AWSEKSService {
                     providerType = "Self-managed";
                 }
 
+                const eksToken = await EksDashboardDao.getEKSToken(clusterName, keyId);
+
                 return {
                     name: cluster.name,
                     arn: cluster.arn,
@@ -64,8 +67,9 @@ export class AWSEKSService {
                     nodes: nodesDetails,
                     logging: cluster.logging?.clusterLogging || [],
                     encryption: cluster.encryptionConfig || [],
-                    token: "token",
-                    connectUrl: "https://google.com",
+                    token: eksToken?.token || "",
+                    connectUrl: eksToken?.dashboardUrl || ""
+
                 };
             }));
 
@@ -74,5 +78,17 @@ export class AWSEKSService {
             console.error("Error fetching EKS cluster details:", err);
             throw err;
         }
+    }
+
+    static async addEKSToken(data: any) {
+        return await EksDashboardDao.createEksToken(data);
+    }
+
+    static async updateEKSToken(id: any, data: any) {
+        return await EksDashboardDao.updateEKSToken(id, data);
+    }
+
+    static async deleteEKSToken(id: any) {
+        return await EksDashboardDao.deleteEKSToken(id);
     }
 }
