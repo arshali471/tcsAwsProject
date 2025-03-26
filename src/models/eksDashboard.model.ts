@@ -7,6 +7,7 @@ export interface IEKSDashboard extends Document {
     token: string
     clusterName: string
     dashboardUrl: string
+    monitoringUrl: string
     createdBy: Schema.Types.ObjectId;
     updatedBy: Schema.Types.ObjectId;
 }
@@ -19,6 +20,7 @@ const EksDashboardSchema = new Schema<IEKSDashboard>({
     token: String,
     clusterName: String,
     dashboardUrl: String,
+    monitoringUrl: String,
     createdBy: {
         type: Schema.Types.ObjectId,
         ref: "user"

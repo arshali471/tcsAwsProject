@@ -35,8 +35,13 @@ export default class AwsRouter {
 
         // EKS
         this.router.get("/getEksCluster/:keyId", authMiddleware(), AwsEKSController.getEksCluster)
+        this.router.get("/getEksClusterName/:id", authMiddleware(), AwsEKSController.getEksClusterName)
         this.router.post("/addEKSToken", adminAuthMiddleware(), AwsEKSController.addEKSToken)
+        this.router.get("/getEKSToken/:id", adminAuthMiddleware(), AwsEKSController.getEKSTokenById)
+        this.router.get("/getEKSToken/:keyId", adminAuthMiddleware(), AwsEKSController.getEKSTokenByAWSKey)
+        this.router.get("/getAllEKSToken", adminAuthMiddleware(), AwsEKSController.getAllEKSToken)
         this.router.put("/updateEKSToken/:id", adminAuthMiddleware(), AwsEKSController.updateEKSToken)
+        this.router.delete("/deleteEKSToken/:id", adminAuthMiddleware(), AwsEKSController.deleteEKSToken)
 
 
         // RDS
