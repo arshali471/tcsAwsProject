@@ -5,7 +5,7 @@ import { Utility } from "../util/util";
 
 async function main() {
    await DB.connect();
-   let adminEmail = `admin_${Math.floor(1000 + Math.random() * 9000)}@iff.com`;
+   let adminEmail = `cloudadmin@iff.com`;
    let plainPassword = generatePassword();
    let password = Utility.createPasswordHash(plainPassword);
    let newAdmin = await userModel.create({ email: adminEmail, password, isAdmin: true });
