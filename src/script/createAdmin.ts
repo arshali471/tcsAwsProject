@@ -8,7 +8,7 @@ async function main() {
    let adminEmail = `cloudadmin@iff.com`;
    let plainPassword = generatePassword();
    let password = Utility.createPasswordHash(plainPassword);
-   let newAdmin = await userModel.create({ email: adminEmail, password, isAdmin: true, admin: true, addUser: true, addAWSKey: true });
+   let newAdmin = await userModel.create({ email: adminEmail,username: "cloudadmin", password, isAdmin: true, admin: true, addUser: true, addAWSKey: true });
    console.log(newAdmin, "newAdmin");
    console.log('New Admin created');
    console.log('Email: ', adminEmail);
