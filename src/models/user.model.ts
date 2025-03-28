@@ -1,6 +1,8 @@
 import { Schema, model, Document } from "mongoose";
 
 export interface IUser extends Document {
+    email: string
+    phone: string
     username: string
     password: string
     isActive: boolean
@@ -10,6 +12,8 @@ export interface IUser extends Document {
 }
 
 const UserSchema = new Schema<IUser>({
+    email: String,
+    phone: String,
     username: String, 
     password: String, 
     isActive: {

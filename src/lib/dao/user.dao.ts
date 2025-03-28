@@ -13,6 +13,10 @@ export class UserDao {
         return await userModel.findById(id, "-password");
     }
 
+    static async getUserByEmail(email: string) {
+        return await userModel.findOne({ email })
+    }
+
     static async getAllUser() {
         return await userModel.find({}, "-password")
     }

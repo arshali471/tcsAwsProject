@@ -38,6 +38,10 @@ export class UserService {
     static async getUserPassword(userId: any) {
         return await UserDao.getUserPassword(userId);
     }
+
+    static async getUserByEmail(email: string) {
+        return await UserDao.getUserByEmail(email);
+    }
 }
 
 

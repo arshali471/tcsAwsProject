@@ -30,7 +30,14 @@ export class UserController {
         try {
             let { username, password } = req.body;
 
-            const user = await UserService.getUserByUsername(username);
+            let user: any;
+            user = await UserService.getUserByUsername(username);
+
+            if (!user) {
+                user = await UserService.getUserByEmail(username);
+            }
+
+
 
             if (!user) {
                 return res.status(404).send("No user found.")
