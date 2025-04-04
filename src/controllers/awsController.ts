@@ -78,7 +78,8 @@ export class AwsController {
     static async getZabbixStatus(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
             const keyId = req.params.keyId;
-            const data = await AWSStatusCheckService.checkNginxStatusOnLinuxInstances(keyId);
+            // const data = await AWSStatusCheckService.checkNginxStatusOnLinuxInstances(keyId);
+            const data = await AWSStatusCheckService.getAllInstanceDetailsWithNginxStatus(keyId, "ubuntu", "exmbio.pem");
             res.status(200).json(data);
         } catch (err) {
             next(err);

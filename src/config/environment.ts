@@ -28,5 +28,6 @@ export const CONFIG = {
         accessKeyId: process.env.accessKeyId,
         secretAccessKey: process.env.secretAccessKey
     },
-    uploadsFolderPath: path.resolve(__dirname, '../../uploads')
+    uploadsFolderPath: path.resolve(__dirname, '../../uploads'),
+    sshKeyFolderPath: path.resolve(__dirname, '../../ssh-key')
 }

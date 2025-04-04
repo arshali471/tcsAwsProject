@@ -1,6 +1,10 @@
 import { EC2Client, DescribeInstancesCommand } from "@aws-sdk/client-ec2";
 import { SSMClient, SendCommandCommand, GetCommandInvocationCommand, DescribeInstanceInformationCommand } from "@aws-sdk/client-ssm";
 import { AWSKeyService } from "./awsKeyService";
+import { NodeSSH } from "node-ssh";
+import fs from "fs";
+import path from "path";
+import { CONFIG } from "../config/environment";
 
 export class AWSStatusCheckService {
     static async checkNginxStatusOnLinuxInstances(keyId: string) {
@@ -40,7 +44,7 @@ export class AWSStatusCheckService {
             const ssmManagedInstances = ssmData.InstanceInformationList?.map(instance => instance.InstanceId) || [];
 
             // Filter only instances that are managed by SSM
-            const validInstances = instances.filter((instance:any) => ssmManagedInstances.includes(instance.instanceId));
+            const validInstances = instances.filter((instance: any) => ssmManagedInstances.includes(instance.instanceId));
 
             if (validInstances.length === 0) {
                 return { message: "No valid instances found with SSM Agent installed." };
@@ -109,5 +113,184 @@ export class AWSStatusCheckService {
             return { error: error.message };
         }
     }
+
+
+    // static async getAllInstanceDetailsWithNginxStatus(keyId: any, sshUsername: string, privateKeyPath: string) {
+    //     try {
+    //         const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
+    //         const ec2Client = new EC2Client(awsConfig);
+
+    //         const data: any = await ec2Client.send(new DescribeInstancesCommand({}));
+    //         const instances = data.Reservations.flatMap((res: any) => res.Instances);
+
+    //         const ssh = new NodeSSH();
+    //         const results: any[] = [];
+
+    //         for (const instance of instances) {
+    //             const privateIp = instance.PrivateIpAddress;
+
+    //             if (!privateIp) {
+    //                 results.push({ instanceId: instance.InstanceId, status: "No private IP" });
+    //                 continue;
+    //             }
+
+    //             try {
+    //                 await ssh.connect({
+    //                     host: privateIp,
+    //                     username: sshUsername,
+    //                     privateKey: privateKeyPath,
+    //                 });
+
+    //                 const result = await ssh.execCommand("docker --version");
+
+    //                 results.push({
+    //                     instanceId: instance.InstanceId,
+    //                     ip: privateIp,
+    //                     dockerVersion: result.stdout.trim() || result.stderr.trim(),
+    //                 });
+
+    //                 ssh.dispose();
+    //             } catch (sshErr: any) {
+    //                 results.push({
+    //                     instanceId: instance.InstanceId,
+    //                     ip: privateIp,
+    //                     nginxStatus: `SSH Error: ${sshErr.message}`,
+    //                 });
+    //             }
+    //         }
+
+    //         return results;
+    //     } catch (err) {
+    //         console.error("Error fetching instance details or nginx status:", err);
+    //         throw err;
+    //     }
+    // }
+
+    // static async getAllInstanceDetailsWithNginxStatus(
+    //     keyId: any,
+    //     sshUsername: string,
+    //     privateKeyRelativePath: string
+    //   ) {
+    //     try {
+    //       const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
+    //       const ec2Client = new EC2Client(awsConfig);
+    //       const data: any = await ec2Client.send(new DescribeInstancesCommand({}));
+    //       const instances = data.Reservations.flatMap((res: any) => res.Instances);
+    
+    //       const ssh = new NodeSSH();
+    //       const results: any[] = [];
+
+    //       const privateKeyPath = path.resolve(CONFIG.sshKeyFolderPath, privateKeyRelativePath);
+    //       console.log(privateKeyPath, "privateKeyPath")
+    //       const privateKey = fs.readFileSync(privateKeyPath, "utf8");
+    
+    //       for (const instance of instances) {
+    //         const privateIp = instance.PrivateIpAddress;
+    
+    //         if (!privateIp) {
+    //           results.push({ instanceId: instance.InstanceId, status: "No private IP" });
+    //           continue;
+    //         }
+    
+    //         try {
+    //           await ssh.connect({
+    //             host: privateIp,
+    //             username: sshUsername,
+    //             privateKey: privateKey,
+    //           });
+    
+    //           const result = await ssh.execCommand("systemctl is-active nginx");
+    
+    //           results.push({
+    //             instanceId: instance.InstanceId,
+    //             ip: privateIp,
+    //             nginxStatus: result.stdout.trim() || result.stderr.trim(),
+    //           });
+    
+    //           ssh.dispose();
+    //         } catch (sshErr: any) {
+    //           results.push({
+    //             instanceId: instance.InstanceId,
+    //             ip: privateIp,
+    //             nginxStatus: `SSH Error: ${sshErr.message}`,
+    //           });
+    //         }
+    //       }
+    
+    //       return results;
+    //     } catch (err) {
+    //       console.error("Error fetching instance details or nginx status:", err);
+    //       throw err;
+    //     }
+    //   }
+
+
+    static async getAllInstanceDetailsWithNginxStatus(
+        keyId: any,
+        sshUsername: string,
+        privateKeyRelativePath: string
+      ) {
+        try {
+          const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
+          const ec2Client = new EC2Client(awsConfig);
+          const data: any = await ec2Client.send(new DescribeInstancesCommand({}));
+          const instances = data.Reservations.flatMap((res: any) => res.Instances);
+    
+          const ssh = new NodeSSH();
+          const results: any[] = [];
+    
+          const privateKeyPath = path.resolve(CONFIG.sshKeyFolderPath, privateKeyRelativePath);
+          console.log("Using private key path:", privateKeyPath);
+          const privateKey = fs.readFileSync(privateKeyPath, "utf8");
+    
+          const TARGET_IP = "10.35.58.225";
+    
+          for (const instance of instances) {
+            const privateIp = instance.PrivateIpAddress;
+    
+            if (privateIp !== TARGET_IP) {
+                console.log(`Skipping instance ${instance.InstanceId} with IP ${privateIp}`);
+              continue; // Skip all other instances
+            }
+    
+            if (!privateIp) {
+              results.push({ instanceId: instance.InstanceId, status: "No private IP" });
+              continue;
+            }
+    
+            try {
+              await ssh.connect({
+                host: privateIp,
+                username: sshUsername,
+                privateKey: privateKey,
+              });
+    
+              console.log(`✅ SSH connected to ${privateIp} (${instance.InstanceId})`);
+    
+              const result = await ssh.execCommand("systemctl is-active nginx");
+    
+              results.push({
+                instanceId: instance.InstanceId,
+                ip: privateIp,
+                nginxStatus: result.stdout.trim() || result.stderr.trim(),
+              });
+    
+              ssh.dispose();
+            } catch (sshErr: any) {
+              results.push({
+                instanceId: instance.InstanceId,
+                ip: privateIp,
+                nginxStatus: `SSH Error: ${sshErr.message}`,
+              });
+            }
+          }
+    
+          return results;
+        } catch (err) {
+          console.error("Error fetching instance details or nginx status:", err);
+          throw err;
+        }
+    }
+
 }
 

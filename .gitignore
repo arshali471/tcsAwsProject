@@ -3,3 +3,4 @@ build
 .env
 uploads
 .cache
+ssh-key
