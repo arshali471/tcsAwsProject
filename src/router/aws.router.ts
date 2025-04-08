@@ -5,6 +5,8 @@ import { AwsEKSController } from '../controllers/awsEKSController';
 import { AwsRDSController } from '../controllers/awsRDSController';
 import { AwsVolumesController } from '../controllers/awsVolumesController';
 import { adminAuthMiddleware } from '../middleware/AdminAuthMiddleware';
+import { AdminController } from '../controllers/adminController';
+import { upload } from '../helper/fileUploader';
 
 export default class AwsRouter {
     public router: Router;
@@ -22,6 +24,9 @@ export default class AwsRouter {
 
         // Check the zabbix-status
         this.router.get("/getZabbixStatus/:keyId", authMiddleware(), AwsController.getZabbixStatus)
+        this.router.post("/addSshKey", adminAuthMiddleware(), upload.single("upload"), AdminController.addSshKey)
+        this.router.get("/getSshKey", adminAuthMiddleware(), AdminController.getSshKey)
+        this.router.delete("/deleteSshKey/:id", adminAuthMiddleware(), AdminController.deleteSshKey)
 
 
         // Volumes

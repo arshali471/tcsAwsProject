@@ -15,12 +15,12 @@ export class AwsController {
             const environment = String(awsConfig.enviroment);
             if (query === "api") {
                 const data = await EC2InstanceService.getAllInstanceDetails(keyId);
-                return res.status(200).json({data, message: "Data fetched from API"});
+                return res.status(200).json({ data, message: "Data fetched from API" });
             } else if (query === "db") {
                 const date = String(req.query.date);
 
                 const data = await EC2InstanceService.getInstancesByDate(date, environment);
-                return res.status(200).json({data, message: "Data fetched from DB"});
+                return res.status(200).json({ data, message: "Data fetched from DB" });
             } else if (query === "api-save-db") {
                 const data = await EC2InstanceService.getAllInstanceDetails(keyId);
                 // return res.status(200).json({data, message: "Data fetched from API"});
@@ -30,10 +30,10 @@ export class AwsController {
                         environment: environment
                     }
                 })
-                console.log(enviromentData.environment, environment , "enviroment")
+                console.log(enviromentData.environment, environment, "enviroment")
 
                 const saveData = await EC2InstanceService.saveInstanceDetails(enviromentData, environment);
-                return res.status(200).json({data: saveData, message: "Fetched from API and Data saved to DB"});
+                return res.status(200).json({ data: saveData, message: "Fetched from API and Data saved to DB" });
             }
 
             res.status(200).json("please provide valide query");
@@ -78,11 +78,14 @@ export class AwsController {
     static async getZabbixStatus(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
             const keyId = req.params.keyId;
-            // const data = await AWSStatusCheckService.checkNginxStatusOnLinuxInstances(keyId);
-            const data = await AWSStatusCheckService.getAllInstanceDetailsWithNginxStatus(keyId, "ubuntu", "exmbio.pem");
+            const { sshUsername, sshKeyPath, operatingSystem } : any = req.query;
+            if (!sshUsername || !sshKeyPath || !operatingSystem) {
+                return res.status(400).json({ message: "Please provide sshUsername, sshKeyPath and operatingSystem" });
+            }
+            const data = await AWSStatusCheckService.getAllInstanceDetailsWithNginxStatus(keyId, sshUsername, sshKeyPath, operatingSystem);
             res.status(200).json(data);
         } catch (err) {
             next(err);
         }
     }
-}   
+}
