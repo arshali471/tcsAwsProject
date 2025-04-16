@@ -83,6 +83,9 @@ export class AwsController {
                 return res.status(400).json({ message: "Please provide sshUsername, sshKeyPath and operatingSystem" });
             }
             const data = await AWSStatusCheckService.getAllInstanceDetailsWithNginxStatus(keyId, sshUsername, sshKeyPath, operatingSystem);
+            if (data?.error) {
+                return res.status(404).send(data)
+            }
             res.status(200).json(data);
         } catch (err) {
             next(err);

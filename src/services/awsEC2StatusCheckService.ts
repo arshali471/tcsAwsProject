@@ -342,91 +342,97 @@ export class AWSStatusCheckService {
                 return {
                     message: "No running instance found with provided operating system",
                     operatingSystem,
+                    error: true
                 };
             }
 
             for (const instance of filteredInstances) {
                 const privateIp = instance.PrivateIpAddress;
+            
+                const instanceName = instance.Tags?.find((tag: any) => tag.Key === "Name")?.Value || "Unknown";
+                const operatingSystem = instance.Tags?.find((tag: any) => tag.Key === "Operating_System")?.Value || "Unknown";
+                const platform = instance.PlatformDetails || "Unknown";
+                const state = instance.State?.Name || "Unknown";
+                const instanceId = instance.InstanceId;
+            
+                const baseResult: any = {
+                    instanceName,
+                    instanceId,
+                    ip: privateIp || "N/A",
+                    os: operatingSystem,
+                    platform,
+                    state,
+                    services: {
+                        zabbixAgent: "Not checked",
+                        crowdStrike: "Not checked",
+                        qualys: "Not checked",
+                        cloudWatch: "Not checked"
+                    },
+                    versions: {
+                        zabbixAgent: "N/A",
+                        crowdStrike: "N/A",
+                        qualys: "N/A",
+                        cloudWatch: "N/A"
+                    },
+                    error: null as string | null
+                };
+
                 if (!privateIp) {
-                    results.push({ instanceId: instance.InstanceId, status: "No private IP" });
+                    baseResult.error = "No private IP";
+                    results.push(baseResult);
                     continue;
                 }
-
+            
                 const isWindows = instance.Platform === "windows";
                 const ssh = new NodeSSH();
-
+            
                 try {
                     await ssh.connect({
                         host: privateIp,
                         username: sshUsername,
                         privateKey,
                     });
-
-                    console.log(`✅ SSH connected to ${privateIp} (${instance.InstanceId}) [${isWindows ? "Windows" : "Linux"}]`);
-
-                    const servicesToCheck: { service: string; displayName: string }[] = [
-                        { service: "zabbix-agent2", displayName: "zabbix agent" },
-                        { service: "falcon-sensor", displayName: "Crowd Strike" },
-                        { service: "qualys-cloud-agent", displayName: "Qualys" },
-                        { service: "amazon-cloudwatch-agent", displayName: "CloudWatch" },
+            
+                    console.log(`✅ SSH connected to ${privateIp} (${instanceId}) [${isWindows ? "Windows" : "Linux"}]`);
+            
+                    const servicesToCheck: { service: string; displayName: keyof typeof baseResult.services }[] = [
+                        { service: "zabbix-agent2", displayName: "zabbixAgent" },
+                        { service: "falcon-sensor", displayName: "crowdStrike" },
+                        { service: "qualys-cloud-agent", displayName: "qualys" },
+                        { service: "amazon-cloudwatch-agent", displayName: "cloudWatch" },
                     ];
-
-                    const serviceStatuses: Record<string, string> = {};
-                    const serviceVersions: Record<string, string> = {};
-
+            
                     for (const { service, displayName } of servicesToCheck) {
                         let statusResult, versionResult;
-
+            
                         if (isWindows) {
-                            // Check status
                             statusResult = await ssh.execCommand(
                                 `powershell -Command "(Get-Service -Name '${service}').Status"`
                             );
-
-                            // Check version (Windows approach, may need customization per agent)
                             versionResult = await ssh.execCommand(
                                 `powershell -Command "Get-Command '${service}' | Select-Object -ExpandProperty Version"`
                             );
                         } else {
-                            // Check status
                             statusResult = await ssh.execCommand(`systemctl is-active ${service}`);
-
-                            // Check version (Linux)
                             versionResult = await ssh.execCommand(`${service} --version`);
                         }
-
-                        serviceStatuses[displayName] = statusResult.stdout.trim() || statusResult.stderr.trim();
-                        serviceVersions[displayName] = versionResult.stdout.trim() || versionResult.stderr.trim();
+            
+                        baseResult.services[displayName] =
+                            statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
+            
+                        baseResult.versions[displayName] =
+                            versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
                     }
-
-
-                    results.push({
-                        instanceName: instance.Tags?.find((tag: any) => tag.Key === "Name")?.Value || "Unknown",
-                        instanceId: instance.InstanceId,
-                        ip: privateIp,
-                        os: instance.Tags?.find((tag: any) => tag.Key === "Operating_System")?.Value || "Unknown",
-                        services: serviceStatuses,
-                        versions: serviceVersions,
-                        platform: instance.PlatformDetails,
-                        state: instance.State?.Name || "Unknown",
-                      });
-
-
-                    ssh.dispose();
                 } catch (sshErr: any) {
-                    results.push({
-                        instanceName: instance.Tags?.find((tag: any) => tag.Key === "Name")?.Value || "Unknown",
-                        instanceId: instance.InstanceId,
-                        ip: privateIp,
-                        os: instance.Tags?.find((tag: any) => tag.Key === "Operating_System")?.Value || "Unknown",
-                        platform: instance.PlatformDetails,
-                        state: instance.State?.Name || "Unknown",
-                        error: `SSH Error: ${sshErr.message}`,
-                      });
+                    baseResult.error = `SSH Error: ${sshErr.message}`;
+                } finally {
+                    ssh.dispose(); // Ensure cleanup
                 }
+            
+                results.push(baseResult);
             }
 
-            return results;
+
         } catch (err) {
             console.error("Error fetching instance details or checking status:", err);
             throw err;
