@@ -812,12 +812,12 @@ export class AWSStatusCheckService {
                         {
                             service: "falcon-sensor",
                             displayName: "crowdStrike",
-                            versionCmd: `sudo /opt/CrowdStrike/falconctl -g --version | awk -F': ' '{print $2}'`
+                            versionCmd: `sudo -n /opt/CrowdStrike/falconctl -g --version | awk -F': ' '{print $2}'`
                         },
                         {
                             service: "qualys-cloud-agent",
                             displayName: "qualys",
-                            versionCmd: `grep "Current Agent Version" /var/log/qualys/qualys-cloud-agent.log | head -n1 | sed -n 's/.*Current Agent Version : \\(.*\\) Available.*/\\1/p'`
+                            versionCmd: `sudo -n cat /var/log/qualys/qualys-cloud-agent.log | grep "Current Agent Version" | head -n1 | sed -n 's/.*Current Agent Version : \\(.*\\) Available.*/\\1/p'`
                         },
                         {
                             service: "amazon-cloudwatch-agent",
@@ -825,6 +825,7 @@ export class AWSStatusCheckService {
                             versionCmd: `/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a status | grep -i version | awk -F'"' '{print $4}'`
                         },
                     ];
+
     
                     for (const { service, displayName, versionCmd } of servicesToCheck) {
                         let statusResult, versionResult;
@@ -858,7 +859,7 @@ export class AWSStatusCheckService {
                 totalInstances: results.length,
                 results
             };
-    
+
         } catch (err) {
             console.error("Error fetching instance details or checking status:", err);
             return {
