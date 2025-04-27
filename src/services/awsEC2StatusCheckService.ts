@@ -7,6 +7,7 @@ import path from "path";
 import { CONFIG } from "../config/environment";
 import { SSHKeyService } from "./sshKeyService";
 import { platform } from "os";
+import { StatusRecordDao } from "../lib/dao/statusRecord.dao";
 
 export class AWSStatusCheckService {
     static async checkNginxStatusOnLinuxInstances(keyId: string) {
@@ -852,7 +853,14 @@ export class AWSStatusCheckService {
     
                 results.push(baseResult);
             }
-    
+
+            const statusRecord = results.map((result: any) => ({
+                ...result,
+                awsKeyId: keyId,
+            }));
+
+            await StatusRecordDao.addStatusRecord(statusRecord);
+
             return {
                 success: true,
                 operatingSystem,
