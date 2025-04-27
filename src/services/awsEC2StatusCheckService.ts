@@ -813,7 +813,7 @@ export class AWSStatusCheckService {
                         {
                             service: "falcon-sensor",
                             displayName: "crowdStrike",
-                            versionCmd: `sudo -n /opt/CrowdStrike/falconctl -g --version | awk -F': ' '{print $2}'`
+                            versionCmd: `sudo -n /opt/CrowdStrike/falconctl -g --version | awk -F'= ' '{print $2}'`
                         },
                         {
                             service: "qualys-cloud-agent",
