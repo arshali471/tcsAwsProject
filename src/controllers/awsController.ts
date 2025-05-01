@@ -4,6 +4,7 @@ import { S3BucketService } from "../services/awsS3Service";
 import { EC2InstanceService } from "../services/awsEC2Service";
 import { AWSStatusCheckService } from "../services/awsEC2StatusCheckService";
 import { AWSKeyService } from "../services";
+import { start } from "repl";
 
 
 export class AwsController {
@@ -78,10 +79,21 @@ export class AwsController {
     static async getZabbixStatus(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
             const keyId = req.params.keyId;
-            const { sshUsername, sshKeyPath, operatingSystem } : any = req.query;
+            const { startDate, endDate } = req.query;
+
+
+            const { sshUsername, sshKeyPath, operatingSystem }: any = req.query;
             if (!sshUsername || !sshKeyPath || !operatingSystem) {
                 return res.status(400).json({ message: "Please provide sshUsername, sshKeyPath and operatingSystem" });
             }
+            if (startDate != undefined && endDate != undefined) {
+                const data = await AWSStatusCheckService.getZabbixStatusFromDB(keyId, startDate, endDate, operatingSystem);
+                if (!data) {
+                    return res.status(404).send({results: data})
+                }
+                return res.status(200).json({results: data});
+            }
+
             const data = await AWSStatusCheckService.getAllInstanceDetailsWithNginxStatus(keyId, sshUsername, sshKeyPath, operatingSystem);
             if (data?.error) {
                 return res.status(404).send(data)
@@ -91,4 +103,22 @@ export class AwsController {
             next(err);
         }
     }
+
+    // static async getZabbixStatusFromDB(req: express.Request, res: express.Response, next: express.NextFunction) {
+    //     try {
+    //         const keyId = req.params.keyId;
+    //         const { startDate, endDate } = req.query;
+    //         if (!startDate || !endDate) {
+    //             return res.status(400).json({ message: "Please provide startDate and endDate" });
+    //         }
+    //         const data = await AWSStatusCheckService.getZabbixStatusFromDB(keyId, startDate, endDate);
+    //         if (!data) {
+    //             return res.status(404).send(data)
+    //         }
+    //         res.status(200).json(data);
+    //     } catch (err) {
+    //         next(err);
+    //     }
+    // }
+
 }

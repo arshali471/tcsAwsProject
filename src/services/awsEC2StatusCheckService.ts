@@ -841,9 +841,9 @@ export class AWSStatusCheckService {
     
                         baseResult.services[displayName] =
                             statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
-    
+
                         baseResult.versions[displayName] =
-                            versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
+                           Number(versionResult.stdout)?.toFixed(2) || Number(versionResult.stderr)?.toFixed(2) || "Unknown";
                     }
                 } catch (sshErr: any) {
                     baseResult.error = `SSH Error: ${sshErr.message}`;
@@ -875,6 +875,11 @@ export class AWSStatusCheckService {
                 error: (err as Error).message || "Unexpected error occurred",
             };
         }
+    }
+
+
+    static async getZabbixStatusFromDB(keyId: any, startDate: any, endDate: any, operatingSystem: any) {
+        return await StatusRecordDao.getZabbixStatusFromDB(keyId, startDate, endDate, operatingSystem);
     }
 
 
