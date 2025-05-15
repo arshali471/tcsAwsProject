@@ -8,6 +8,7 @@ import { CONFIG } from "../config/environment";
 import { SSHKeyService } from "./sshKeyService";
 import { platform } from "os";
 import { StatusRecordDao } from "../lib/dao/statusRecord.dao";
+import { error } from "console";
 
 export class AWSStatusCheckService {
     static async checkNginxStatusOnLinuxInstances(keyId: string) {
@@ -479,13 +480,13 @@ export class AWSStatusCheckService {
 
     //         for (const instance of filteredInstances) {
     //             const privateIp = instance.PrivateIpAddress;
-            
+
     //             const instanceName = instance.Tags?.find((tag: any) => tag.Key === "Name")?.Value || "Unknown";
     //             const operatingSystem = instance.Tags?.find((tag: any) => tag.Key === "Operating_System")?.Value || "Unknown";
     //             const platform = instance.PlatformDetails || "Unknown";
     //             const state = instance.State?.Name || "Unknown";
     //             const instanceId = instance.InstanceId;
-            
+
     //             const baseResult: any = {
     //                 instanceName,
     //                 instanceId,
@@ -513,29 +514,29 @@ export class AWSStatusCheckService {
     //                 results.push(baseResult);
     //                 continue;
     //             }
-            
+
     //             const isWindows = instance.Platform === "windows";
     //             const ssh = new NodeSSH();
-            
+
     //             try {
     //                 await ssh.connect({
     //                     host: privateIp,
     //                     username: sshUsername,
     //                     privateKey,
     //                 });
-            
+
     //                 console.log(`✅ SSH connected to ${privateIp} (${instanceId}) [${isWindows ? "Windows" : "Linux"}]`);
-            
+
     //                 const servicesToCheck: { service: string; displayName: keyof typeof baseResult.services }[] = [
     //                     { service: "zabbix-agent2", displayName: "zabbixAgent" },
     //                     { service: "falcon-sensor", displayName: "crowdStrike" },
     //                     { service: "qualys-cloud-agent", displayName: "qualys" },
     //                     { service: "amazon-cloudwatch-agent", displayName: "cloudWatch" },
     //                 ];
-            
+
     //                 for (const { service, displayName } of servicesToCheck) {
     //                     let statusResult, versionResult;
-            
+
     //                     if (isWindows) {
     //                         statusResult = await ssh.execCommand(
     //                             `powershell -Command "(Get-Service -Name '${service}').Status"`
@@ -547,10 +548,10 @@ export class AWSStatusCheckService {
     //                         statusResult = await ssh.execCommand(`systemctl is-active ${service}`);
     //                         versionResult = await ssh.execCommand(`${service} --version`);
     //                     }
-            
+
     //                     baseResult.services[displayName] =
     //                         statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
-            
+
     //                     baseResult.versions[displayName] =
     //                         versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
     //                 }
@@ -559,7 +560,7 @@ export class AWSStatusCheckService {
     //             } finally {
     //                 ssh.dispose(); // Ensure cleanup
     //             }
-            
+
     //             results.push(baseResult);
     //         }
 
@@ -581,28 +582,28 @@ export class AWSStatusCheckService {
     //         const ec2Client = new EC2Client(awsConfig);
     //         const data: any = await ec2Client.send(new DescribeInstancesCommand({}));
     //         const instances = data.Reservations.flatMap((res: any) => res.Instances);
-    
+
     //         const results: any[] = [];
     //         const privateKeyPath = await SSHKeyService.getSSHkeyById(privateKeyRelativePath);
     //         if (!privateKeyPath) {
     //             throw new Error("Private key not found");
     //         }
-    
+
     //         const privateKey = privateKeyPath.sshkey;
-    
+
     //         // Filter by running state and Operating_System tag (partial match)
     //         const filteredInstances = instances.filter((instance: any) => {
     //             const isRunning = instance.State?.Name === "running";
     //             const tags = instance.Tags || [];
     //             const osTag = tags.find((tag: any) => tag.Key === "Operating_System");
-    
+
     //             return (
     //                 isRunning &&
     //                 osTag &&
     //                 osTag.Value.toLowerCase().includes(operatingSystem.toLowerCase())
     //             );
     //         });
-    
+
     //         if (filteredInstances.length === 0) {
     //             return {
     //                 message: "No running instance found with provided operating system",
@@ -610,16 +611,16 @@ export class AWSStatusCheckService {
     //                 error: true
     //             };
     //         }
-    
+
     //         for (const instance of filteredInstances) {
     //             const privateIp = instance.PrivateIpAddress;
-    
+
     //             const instanceName = instance.Tags?.find((tag: any) => tag.Key === "Name")?.Value || "Unknown";
     //             const osTag = instance.Tags?.find((tag: any) => tag.Key === "Operating_System")?.Value || "Unknown";
     //             const platform = instance.PlatformDetails || "Unknown";
     //             const state = instance.State?.Name || "Unknown";
     //             const instanceId = instance.InstanceId;
-    
+
     //             const baseResult: any = {
     //                 instanceName,
     //                 instanceId,
@@ -641,35 +642,35 @@ export class AWSStatusCheckService {
     //                 },
     //                 error: null as string | null
     //             };
-    
+
     //             if (!privateIp) {
     //                 baseResult.error = "No private IP";
     //                 results.push(baseResult);
     //                 continue;
     //             }
-    
+
     //             const isWindows = instance.Platform === "windows";
     //             const ssh = new NodeSSH();
-    
+
     //             try {
     //                 await ssh.connect({
     //                     host: privateIp,
     //                     username: sshUsername,
     //                     privateKey,
     //                 });
-    
+
     //                 console.log(`✅ SSH connected to ${privateIp} (${instanceId}) [${isWindows ? "Windows" : "Linux"}]`);
-    
+
     //                 const servicesToCheck: { service: string; displayName: keyof typeof baseResult.services }[] = [
     //                     { service: "zabbix-agent2", displayName: "zabbixAgent" },
     //                     { service: "falcon-sensor", displayName: "crowdStrike" },
     //                     { service: "qualys-cloud-agent", displayName: "qualys" },
     //                     { service: "amazon-cloudwatch-agent", displayName: "cloudWatch" },
     //                 ];
-    
+
     //                 for (const { service, displayName } of servicesToCheck) {
     //                     let statusResult, versionResult;
-    
+
     //                     if (isWindows) {
     //                         statusResult = await ssh.execCommand(
     //                             `powershell -Command "(Get-Service -Name '${service}').Status"`
@@ -681,10 +682,10 @@ export class AWSStatusCheckService {
     //                         statusResult = await ssh.execCommand(`systemctl is-active ${service}`);
     //                         versionResult = await ssh.execCommand(`${service} --version`);
     //                     }
-    
+
     //                     baseResult.services[displayName] =
     //                         statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
-    
+
     //                     baseResult.versions[displayName] =
     //                         versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
     //                 }
@@ -693,10 +694,10 @@ export class AWSStatusCheckService {
     //             } finally {
     //                 ssh.dispose();
     //             }
-    
+
     //             results.push(baseResult);
     //         }
-    
+
     //         // ✅ Final return after processing all filtered instances
     //         return {
     //             success: true,
@@ -704,7 +705,7 @@ export class AWSStatusCheckService {
     //             totalInstances: results.length,
     //             results
     //         };
-    
+
     //     } catch (err) {
     //         console.error("Error fetching instance details or checking status:", err);
     //         return {
@@ -714,6 +715,193 @@ export class AWSStatusCheckService {
     //     }
     // }
 
+
+    // static async getAllInstanceDetailsWithNginxStatus(
+    //     keyId: any,
+    //     sshUsername: string,
+    //     privateKeyRelativePath: string,
+    //     operatingSystem: string
+    // ) {
+    //     try {
+    //         const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
+    //         const ec2Client = new EC2Client(awsConfig);
+    //         const data: any = await ec2Client.send(new DescribeInstancesCommand({}));
+    //         const instances = data.Reservations.flatMap((res: any) => res.Instances);
+
+    //         const results: any[] = [];
+    //         const privateKeyPath = await SSHKeyService.getSSHkeyById(privateKeyRelativePath);
+    //         if (!privateKeyPath) {
+    //             throw new Error("Private key not found");
+    //         }
+
+    //         const privateKey = privateKeyPath.sshkey;
+
+    //         const filteredInstances = instances.filter((instance: any) => {
+    //             const isRunning = instance.State?.Name === "running";
+    //             const tags = instance.Tags || [];
+    //             const osTag = tags.find((tag: any) => tag.Key === "Operating_System");
+
+    //             return (
+    //                 isRunning &&
+    //                 osTag &&
+    //                 osTag.Value.toLowerCase().includes(operatingSystem.toLowerCase())
+    //             );
+    //         });
+
+    //         if (filteredInstances.length === 0) {
+    //             return {
+    //                 message: "No running instance found with provided operating system",
+    //                 operatingSystem,
+    //                 error: true
+    //             };
+    //         }
+
+    //         for (const instance of filteredInstances) {
+    //             const privateIp = instance.PrivateIpAddress;
+
+    //             const instanceName = instance.Tags?.find((tag: any) => tag.Key === "Name")?.Value || "Unknown";
+    //             const osTag = instance.Tags?.find((tag: any) => tag.Key === "Operating_System")?.Value || "Unknown";
+    //             const platform = instance.PlatformDetails || "Unknown";
+    //             const state = instance.State?.Name || "Unknown";
+    //             const instanceId = instance.InstanceId;
+
+    //             const baseResult: any = {
+    //                 instanceName,
+    //                 instanceId,
+    //                 ip: privateIp || "N/A",
+    //                 os: osTag,
+    //                 platform,
+    //                 state,
+    //                 services: {
+    //                     zabbixAgent: "inactive",
+    //                     crowdStrike: "inactive",
+    //                     qualys: "inactive",
+    //                     cloudWatch: "inactive",
+    //                 },
+    //                 versions: {
+    //                     zabbixAgent: "N/A",
+    //                     crowdStrike: "N/A",
+    //                     qualys: "N/A",
+    //                     cloudWatch: "N/A"
+    //                 },
+    //                 error: null as string | null
+    //             };
+
+    //             if (!privateIp) {
+    //                 baseResult.error = "No private IP";
+    //                 results.push(baseResult);
+    //                 continue;
+    //             }
+
+    //             const isWindows = instance.Platform === "windows";
+    //             const ssh = new NodeSSH();
+
+    //             try {
+    //                 await ssh.connect({
+    //                     host: privateIp,
+    //                     username: sshUsername,
+    //                     privateKey,
+    //                 });
+
+    //                 console.log(`✅ SSH connected to ${privateIp} (${instanceId}) [${isWindows ? "Windows" : "Linux"}]`);
+
+    //                 const servicesToCheck = [
+    //                     {
+    //                         service: "zabbix-agent2",
+    //                         displayName: "zabbixAgent",
+    //                         versionCmd: `zabbix_agent2 --version | head -n1 | awk '{print $3}'`
+    //                     },
+    //                     {
+    //                         service: "falcon-sensor",
+    //                         displayName: "crowdStrike",
+    //                         versionCmd: `sudo -n /opt/CrowdStrike/falconctl -g --version | awk -F'= ' '{print $2}'`
+    //                     },
+    //                     {
+    //                         service: "qualys-cloud-agent",
+    //                         displayName: "qualys",
+    //                         versionCmd: `sudo -n cat /var/log/qualys/qualys-cloud-agent.log | grep "Current Agent Version" | head -n1 | sed -n 's/.*Current Agent Version : \\(.*\\) Available.*/\\1/p'`
+    //                     },
+    //                     {
+    //                         service: "amazon-cloudwatch-agent",
+    //                         displayName: "cloudWatch",
+    //                         versionCmd: `/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a status | grep -i version | awk -F'"' '{print $4}'`
+    //                     },
+    //                 ];
+
+
+    //                 // for (const { service, displayName, versionCmd } of servicesToCheck) {
+    //                 //     let statusResult, versionResult;
+
+    //                 //     if (isWindows) {
+    //                 //         statusResult = await ssh.execCommand(`powershell -Command "(Get-Service -Name '${service}').Status"`);
+    //                 //         versionResult = await ssh.execCommand(`powershell -Command "Get-Command '${service}' | Select-Object -ExpandProperty Version"`); // Adjust this if needed
+    //                 //     } else {
+    //                 //         statusResult = await ssh.execCommand(`systemctl is-active ${service}`);
+    //                 //         versionResult = await ssh.execCommand(versionCmd);
+    //                 //     }
+
+    //                 //     baseResult.services[displayName] =
+    //                 //         statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
+
+    //                 //     baseResult.versions[displayName] =
+    //                 //         versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
+    //                 // }
+
+    //                 for (const { service, displayName, versionCmd } of servicesToCheck) {
+    //                     let statusResult, versionResult;
+
+    //                     if (isWindows) {
+    //                         statusResult = await ssh.execCommand(`powershell -Command "(Get-Service -Name '${service}').Status"`);
+    //                         versionResult = await ssh.execCommand(`powershell -Command "Get-Command '${service}' | Select-Object -ExpandProperty Version"`); // Adjust this if needed
+    //                     } else {
+    //                         statusResult = await ssh.execCommand(`systemctl is-active ${service}`);
+    //                         versionResult = await ssh.execCommand(versionCmd);
+    //                     }
+
+    //                     baseResult.services[displayName] =
+    //                         statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
+
+    //                     const rawVersion = versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
+    //                     if (rawVersion !== "Unknown") {
+    //                         // Parse and format version to two decimal places
+    //                         const formattedVersion = parseFloat(rawVersion).toFixed(2);
+    //                         baseResult.versions[displayName] = formattedVersion;
+    //                     } else {
+    //                         baseResult.versions[displayName] = "Unknown";
+    //                     }
+    //                 }
+
+    //             } catch (sshErr: any) {
+    //                 baseResult.error = `SSH Error: ${sshErr.message}`;
+    //             } finally {
+    //                 ssh.dispose();
+    //             }
+
+    //             results.push(baseResult);
+    //         }
+
+    //         const statusRecord = results.map((result: any) => ({
+    //             ...result,
+    //             awsKeyId: keyId,
+    //         }));
+
+    //         await StatusRecordDao.addStatusRecord(statusRecord);
+
+    //         return {
+    //             success: true,
+    //             operatingSystem,
+    //             totalInstances: results.length,
+    //             results
+    //         };
+
+    //     } catch (err) {
+    //         console.error("Error fetching instance details or checking status:", err);
+    //         return {
+    //             success: false,
+    //             error: (err as Error).message || "Unexpected error occurred",
+    //         };
+    //     }
+    // }
 
     static async getAllInstanceDetailsWithNginxStatus(
         keyId: any,
@@ -726,27 +914,28 @@ export class AWSStatusCheckService {
             const ec2Client = new EC2Client(awsConfig);
             const data: any = await ec2Client.send(new DescribeInstancesCommand({}));
             const instances = data.Reservations.flatMap((res: any) => res.Instances);
-    
+
             const results: any[] = [];
             const privateKeyPath = await SSHKeyService.getSSHkeyById(privateKeyRelativePath);
             if (!privateKeyPath) {
                 throw new Error("Private key not found");
             }
-    
+
             const privateKey = privateKeyPath.sshkey;
-    
+
             const filteredInstances = instances.filter((instance: any) => {
                 const isRunning = instance.State?.Name === "running";
                 const tags = instance.Tags || [];
                 const osTag = tags.find((tag: any) => tag.Key === "Operating_System");
-    
+
                 return (
                     isRunning &&
                     osTag &&
-                    osTag.Value.toLowerCase().includes(operatingSystem.toLowerCase())
+                    osTag.Value.toLowerCase().includes(operatingSystem.toLowerCase()) &&
+                    instance.Platform !== "windows"
                 );
             });
-    
+
             if (filteredInstances.length === 0) {
                 return {
                     message: "No running instance found with provided operating system",
@@ -754,16 +943,16 @@ export class AWSStatusCheckService {
                     error: true
                 };
             }
-    
+
             for (const instance of filteredInstances) {
                 const privateIp = instance.PrivateIpAddress;
-    
+
                 const instanceName = instance.Tags?.find((tag: any) => tag.Key === "Name")?.Value || "Unknown";
                 const osTag = instance.Tags?.find((tag: any) => tag.Key === "Operating_System")?.Value || "Unknown";
                 const platform = instance.PlatformDetails || "Unknown";
                 const state = instance.State?.Name || "Unknown";
                 const instanceId = instance.InstanceId;
-    
+
                 const baseResult: any = {
                     instanceName,
                     instanceId,
@@ -783,27 +972,26 @@ export class AWSStatusCheckService {
                         qualys: "N/A",
                         cloudWatch: "N/A"
                     },
-                    error: null as string | null
+                    error: false
                 };
-    
+
                 if (!privateIp) {
                     baseResult.error = "No private IP";
                     results.push(baseResult);
                     continue;
                 }
-    
-                const isWindows = instance.Platform === "windows";
+
                 const ssh = new NodeSSH();
-    
+
                 try {
                     await ssh.connect({
                         host: privateIp,
                         username: sshUsername,
                         privateKey,
                     });
-    
-                    console.log(`✅ SSH connected to ${privateIp} (${instanceId}) [${isWindows ? "Windows" : "Linux"}]`);
-    
+
+                    console.log(`✅ SSH connected to ${privateIp} (${instanceId})`);
+
                     const servicesToCheck = [
                         {
                             service: "zabbix-agent2",
@@ -827,55 +1015,31 @@ export class AWSStatusCheckService {
                         },
                     ];
 
-    
-                    // for (const { service, displayName, versionCmd } of servicesToCheck) {
-                    //     let statusResult, versionResult;
-    
-                    //     if (isWindows) {
-                    //         statusResult = await ssh.execCommand(`powershell -Command "(Get-Service -Name '${service}').Status"`);
-                    //         versionResult = await ssh.execCommand(`powershell -Command "Get-Command '${service}' | Select-Object -ExpandProperty Version"`); // Adjust this if needed
-                    //     } else {
-                    //         statusResult = await ssh.execCommand(`systemctl is-active ${service}`);
-                    //         versionResult = await ssh.execCommand(versionCmd);
-                    //     }
-    
-                    //     baseResult.services[displayName] =
-                    //         statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
-    
-                    //     baseResult.versions[displayName] =
-                    //         versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
-                    // }
-
                     for (const { service, displayName, versionCmd } of servicesToCheck) {
-                        let statusResult, versionResult;
-                    
-                        if (isWindows) {
-                            statusResult = await ssh.execCommand(`powershell -Command "(Get-Service -Name '${service}').Status"`);
-                            versionResult = await ssh.execCommand(`powershell -Command "Get-Command '${service}' | Select-Object -ExpandProperty Version"`); // Adjust this if needed
-                        } else {
-                            statusResult = await ssh.execCommand(`systemctl is-active ${service}`);
-                            versionResult = await ssh.execCommand(versionCmd);
-                        }
-                    
+                        const statusResult = await ssh.execCommand(`systemctl is-active ${service}`);
+                        const versionResult = await ssh.execCommand(versionCmd);
+
                         baseResult.services[displayName] =
                             statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
-                    
+
                         const rawVersion = versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
-                        if (rawVersion !== "Unknown") {
-                            // Parse and format version to two decimal places
-                            const formattedVersion = parseFloat(rawVersion).toFixed(2);
-                            baseResult.versions[displayName] = formattedVersion;
+                        if (rawVersion !== "Unknown" && !isNaN(parseFloat(rawVersion))) {
+                            baseResult.versions[displayName] = parseFloat(rawVersion).toFixed(2);
                         } else {
                             baseResult.versions[displayName] = "Unknown";
                         }
                     }
 
                 } catch (sshErr: any) {
-                    baseResult.error = `SSH Error: ${sshErr.message}`;
+                    // baseResult.error = true;
+                    return {
+                        message: `SSH Error: ${sshErr.message} for ip ${privateIp}. Kindly provide the correct SSH key`,
+                        error: true
+                    };
                 } finally {
                     ssh.dispose();
                 }
-    
+
                 results.push(baseResult);
             }
 
@@ -901,6 +1065,7 @@ export class AWSStatusCheckService {
             };
         }
     }
+
 
 
     static async getZabbixStatusFromDB(keyId: any, startDate: any, endDate: any, operatingSystem: any) {
