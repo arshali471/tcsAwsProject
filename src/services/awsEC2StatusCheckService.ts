@@ -8,7 +8,6 @@ import { CONFIG } from "../config/environment";
 import { SSHKeyService } from "./sshKeyService";
 import { platform } from "os";
 import { StatusRecordDao } from "../lib/dao/statusRecord.dao";
-import { error } from "console";
 
 export class AWSStatusCheckService {
     static async checkNginxStatusOnLinuxInstances(keyId: string) {
@@ -972,7 +971,7 @@ export class AWSStatusCheckService {
                         qualys: "N/A",
                         cloudWatch: "N/A"
                     },
-                    error: false
+                    error: null
                 };
 
                 if (!privateIp) {
@@ -1031,11 +1030,7 @@ export class AWSStatusCheckService {
                     }
 
                 } catch (sshErr: any) {
-                    // baseResult.error = true;
-                    return {
-                        message: `SSH Error: ${sshErr.message} for ip ${privateIp}. Kindly provide the correct SSH key`,
-                        error: true
-                    };
+                    baseResult.error = `SSH Error: ${sshErr.message}`;
                 } finally {
                     ssh.dispose();
                 }
