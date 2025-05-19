@@ -39,7 +39,7 @@ export class EC2InstanceService {
     }
 
     static async saveInstanceDetails(data: any, environment: any) {
-        return await EC2Dao.saveInstancesDetails(data, environment);
+        return await EC2Dao.saveInstanceDetails(data, environment);
     }
 
     static async getInstancesByDate(date: string, environment: string) {

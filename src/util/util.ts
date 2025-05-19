@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import { CONFIG } from "../config/environment";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 export class Response {
     data: any;
@@ -38,5 +39,9 @@ export class Utility {
             CONFIG.jwt.secret,
             { expiresIn: "1h" }
         );
+    }
+
+    static createHash(value: string): string {
+        return crypto.createHash("sha256").update(value).digest("hex");
     }
 }

@@ -1,4 +1,6 @@
 import { Schema, model, Document } from "mongoose";
+import mongooseEncryption from "mongoose-encryption";
+import { CONFIG } from "../config/environment";
 import { IAWSKey } from "./awsKeys.model";
 
 export interface IServiceStatus {
@@ -28,7 +30,6 @@ export interface IStatusRecord extends Document {
     error: string | null;
 }
 
-// ⚡ No need to type generic here for nested schemas!
 const ServiceStatusSchema = new Schema({
     zabbixAgent: { type: String, default: "inactive" },
     crowdStrike: { type: String, default: "inactive" },
@@ -64,6 +65,34 @@ const statusRecordSchema = new Schema<IStatusRecord>({
     collection: "statusRecord"
 });
 
+// 🔐 Encryption
+const encKey = CONFIG.encKey;
+const sigKey = CONFIG.sigKey;
+
+if (!encKey || !sigKey) {
+    throw new Error("ENCRYPTION_SECRET and SIGNING_SECRET must be set");
+}
+
+statusRecordSchema.plugin(mongooseEncryption, {
+    encryptionKey: Buffer.from(encKey, "base64"),
+    signingKey: Buffer.from(sigKey, "base64"),
+    encryptedFields: [
+        "instanceName",
+        "instanceId",
+        "ip",
+        "platform",
+        "state",
+        "services",
+        "versions",
+        "error"
+    ],
+    excludeFromEncryption: [
+        "_id",
+        "os",
+        "awsKeyId",
+        "createdAt",
+        "updatedAt"
+    ]
+});
+
 export default model<IStatusRecord>("statusRecord", statusRecordSchema);
-
-

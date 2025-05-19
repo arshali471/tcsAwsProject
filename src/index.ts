@@ -3,6 +3,8 @@ import http from "http";
 import { normalizePort, onError } from "./serverHandler";
 import fs from 'fs';
 import { CONFIG }  from "./config/environment";
+import "./services/cronJob/fetchInstance.cron";
+
 
 const SERVER = new Server();
 

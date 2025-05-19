@@ -1,16 +1,20 @@
-import cluster from "cluster";
+import awsKeysModel from "../../models/awsKeys.model";
 import eksDashboardModel from "../../models/eksDashboard.model";
 import mongoose from 'mongoose';
 
 export class EksDashboardDao {
-    static async createEksToken(payload: any) {
-        const { clusterName } = payload;
+    // static async createEksToken(payload: any) {
+    //     const { clusterName } = payload;
 
-        return await eksDashboardModel.findOneAndUpdate(
-            { clusterName },
-            payload,
-            { new: true, upsert: true } // upsert: create if not exists, new: return the updated doc
-        );
+    //     return await eksDashboardModel.findOneAndUpdate(
+    //         { clusterName },
+    //         payload,
+    //         { new: true, upsert: true } // upsert: create if not exists, new: return the updated doc
+    //     );
+    // }
+
+    static async createEksToken(payload: any) {
+        return await eksDashboardModel.create(payload);
     }
 
     static async getEKSToken(clusterName: string, awsKeyId: any) {
@@ -46,7 +50,7 @@ export class EksDashboardDao {
 
             if (search.search) {
                 query.$or.push({
-                    clusterName: { $regex: search.search, $options: 'i' },
+                    clusterName: { $regex: search.search, $options: "i" },
                 });
             }
 
@@ -57,16 +61,41 @@ export class EksDashboardDao {
             }
         }
 
-        const data = await eksDashboardModel
+        // Step 1: Fetch EKS records (raw)
+        let data: any = await eksDashboardModel
             .find(query)
-            .populate("awsKeyId", "region enviroment")
             .skip(skip)
-            .limit(limit);
+            .limit(limit)
+            .sort({ createdAt: -1 });
 
+        // Step 2: Inject awsKey data manually into each record
+        data = await Promise.all(
+            data.map(async (doc: any) => {
+                const obj = doc.toObject();
+                const awsKeyId = obj.awsKeyId?._id || obj.awsKeyId;
+
+                if (awsKeyId) {
+                    const awsKey = await awsKeysModel.findById({ _id: awsKeyId});
+                    if (awsKey) {
+                        obj.awsKeyId = {
+                            _id: awsKey._id,
+                            region: awsKey.region,
+                            enviroment: awsKey.enviroment
+                        };
+                    }
+                }
+
+                return obj;
+            })
+        );
+
+        // Step 3: Count
         const count = await eksDashboardModel.countDocuments(query);
 
         return { data, count };
     }
+
+
 
 
 }

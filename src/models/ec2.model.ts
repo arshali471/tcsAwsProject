@@ -1,4 +1,14 @@
 import { Schema, model, Document } from "mongoose";
+import mongooseEncryption from "mongoose-encryption";
+import { CONFIG } from "../config/environment";
+
+
+const encKey = CONFIG.encKey;
+const sigKey = CONFIG.sigKey;
+
+if (!encKey || !sigKey) {
+    throw new Error("ENCRYPTION_SECRET and SIGNING_SECRET must be set");
+}
 
 export interface IEC2 extends Document {
     AmiLaunchIndex: number;
@@ -237,10 +247,66 @@ const EC2Schema = new Schema<IEC2>({
     CurrentInstanceBootMode: String,
     environment: String
 },
-{
-    versionKey: false,
-    timestamps: true,
-    collection: "ec2"
+    {
+        versionKey: false,
+        timestamps: true,
+        collection: "ec2"
+    });
+
+
+console.log(encKey, "encKey");
+console.log(sigKey, "sigKey");
+
+console.log("Encryption key length:", Buffer.from(encKey, 'base64').length); // should be 32
+console.log("Signing key length:", Buffer.from(sigKey, 'base64').length);     // should be 64
+
+EC2Schema.plugin(mongooseEncryption, {
+  encryptionKey: Buffer.from(encKey, "base64"),
+  signingKey: Buffer.from(sigKey, "base64"),
+  encryptedFields: [
+    "AmiLaunchIndex",
+    "ImageId",
+    "InstanceType",
+    "KeyName",
+    "LaunchTime",
+    "Monitoring",
+    "Placement",
+    "PrivateDnsName",
+    "PrivateIpAddress",
+    "ProductCodes",
+    "PublicDnsName",
+    "State",
+    "StateTransitionReason",
+    "SubnetId",
+    "VpcId",
+    "Architecture",
+    "BlockDeviceMappings",
+    "ClientToken",
+    "EbsOptimized",
+    "EnaSupport",
+    "Hypervisor",
+    "NetworkInterfaces",
+    "RootDeviceName",
+    "RootDeviceType",
+    "SecurityGroups",
+    "SourceDestCheck",
+    "StateReason",
+    "Tags",
+    "VirtualizationType",
+    "CpuOptions",
+    "CapacityReservationSpecification",
+    "HibernationOptions",
+    "MetadataOptions",
+    "EnclaveOptions",
+    "PlatformDetails",
+    "UsageOperation",
+    "UsageOperationUpdateTime",
+    "PrivateDnsNameOptions",
+    "MaintenanceOptions",
+    "CurrentInstanceBootMode",
+  ],
+  excludeFromEncryption: ["_id", "InstanceId", "createdAt", "updatedAt", "environment"]
 });
+
 
 export default model<IEC2>("ec2", EC2Schema);

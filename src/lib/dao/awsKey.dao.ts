@@ -6,8 +6,25 @@ export class AWSKeyDao {
     }
 
     static async getAllAWSKey() {
-        return await awsKeysModel.find({}, "-secretAccessKey").populate("createdBy updatedBy", "username");
+        // Step 1: Fetch all documents without projection
+        let data: any = await awsKeysModel.find({});
+
+        // Step 2: Populate createdBy and updatedBy with username
+        data = await awsKeysModel.populate(data, [
+            { path: "createdBy", select: "username" },
+            { path: "updatedBy", select: "username" }
+        ]);
+
+        // Step 3: Remove secretAccessKey manually
+        data = data.map((doc: any) => {
+            const obj = doc.toObject();
+            delete obj.secretAccessKey;
+            return obj;
+        });
+
+        return data;
     }
+
 
     static async getAWSKeyById(keyId: any) {
         return await awsKeysModel.findById({ _id: keyId });
@@ -24,6 +41,10 @@ export class AWSKeyDao {
     }
 
     static async deleteAWSKey(id: any) {
-        return await awsKeysModel.findByIdAndDelete({_id: id}); 
+        return await awsKeysModel.findByIdAndDelete({ _id: id });
+    }
+
+    static async getAllAWSKeyId() {
+        return await awsKeysModel.find({}, "_id enviroment");
     }
 }

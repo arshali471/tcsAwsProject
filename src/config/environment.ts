@@ -23,6 +23,8 @@ export const CONFIG = {
     cookie: {
         secret: "@#$@#4knshdf82#9382yrknjef9@#$"
     },
+    encKey: process.env.ENCRYPTION_SECRET,
+    sigKey: process.env.SIGNING_SECRET,
     aws: {
         region: process.env.region,
         accessKeyId: process.env.accessKeyId,

@@ -8,7 +8,7 @@ export class AWSKeyService {
     }
 
     static async getAllAWSKey() {
-        return await AWSKeyDao.getAllAWSKey(); 
+        return await AWSKeyDao.getAllAWSKey();
     }
 
     static async getAWSKeyById(keyId: any) {
@@ -34,6 +34,10 @@ export class AWSKeyService {
 
     static async deleteAWSKey(id: any) {
         return await AWSKeyDao.deleteAWSKey(id); 
+    }
+
+    static async getAllAWSKeyId() {
+        return await AWSKeyDao.getAllAWSKeyId();
     }
 }
 

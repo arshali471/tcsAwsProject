@@ -2,6 +2,7 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { SSHKeyService } from "../services/sshKeyService";
+import { Utility } from "../util/util";
 
 
 export class AdminController {
@@ -18,13 +19,17 @@ export class AdminController {
 
             const sshkeyContent = fs.readFileSync(sshKeyPath, "utf8");
 
-            const sshKeyExists = await SSHKeyService.getSSHkeyByName(file.originalname);
+            const sshKeyHash = Utility.createHash(file.originalname);
+
+
+            const sshKeyExists = await SSHKeyService.getSSHkeyByName(sshKeyHash);
 
             if (sshKeyExists) {
                 return res.status(400).json({ message: "SSH key with this name already exists" });
             }
 
             const newKey = await SSHKeyService.createSSHKey({
+                sshKeyHash: sshKeyHash,
                 sshKeyName: file.originalname,
                 sshkey: sshkeyContent,
                 createdBy: req.user?._id, // assuming you're attaching user to req via auth middleware
