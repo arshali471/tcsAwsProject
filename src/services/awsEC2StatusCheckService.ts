@@ -960,10 +960,10 @@ export class AWSStatusCheckService {
                     platform,
                     state,
                     services: {
-                        zabbixAgent: "inactive",
-                        crowdStrike: "inactive",
-                        qualys: "inactive",
-                        cloudWatch: "inactive",
+                        zabbixAgent: "error",
+                        crowdStrike: "error",
+                        qualys: "error",
+                        cloudWatch: "error",
                     },
                     versions: {
                         zabbixAgent: "N/A",
