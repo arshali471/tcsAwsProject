@@ -49,6 +49,7 @@ export class CronController {
             for (const key of awsConfig) {
                 const keyId = key._id;
                 const environment = String(key.enviroment);
+                console.log(environment, keyId, "keyId");
 
                 const data = await EC2InstanceService.getAllInstanceDetails(keyId);
                 const environmentData = data.map((item: any) => ({

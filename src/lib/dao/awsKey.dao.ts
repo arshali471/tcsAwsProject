@@ -45,6 +45,6 @@ export class AWSKeyDao {
     }
 
     static async getAllAWSKeyId() {
-        return await awsKeysModel.find({}, "_id enviroment");
+        return await awsKeysModel.find({}, "-secretAccessKey  -createdAt -updatedAt -createdBy -updatedBy -accessKeyId");
     }
 }
