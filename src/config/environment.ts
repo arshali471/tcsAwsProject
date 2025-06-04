@@ -25,6 +25,7 @@ export const CONFIG = {
     },
     encKey: process.env.ENCRYPTION_SECRET,
     sigKey: process.env.SIGNING_SECRET,
+    masterKey: process.env.MASTER_KEY,
     aws: {
         region: process.env.region,
         accessKeyId: process.env.accessKeyId,

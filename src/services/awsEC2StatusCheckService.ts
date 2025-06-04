@@ -937,9 +937,10 @@ export class AWSStatusCheckService {
 
             if (filteredInstances.length === 0) {
                 return {
-                    message: "No running instance found with provided operating system",
+                    message: `No running instance found with provided operating system ${operatingSystem}`,
                     operatingSystem,
-                    error: true
+                    error: true,
+                    success: false
                 };
             }
 
@@ -1056,7 +1057,7 @@ export class AWSStatusCheckService {
             console.error("Error fetching instance details or checking status:", err);
             return {
                 success: false,
-                error: (err as Error).message || "Unexpected error occurred",
+                message: (err as Error).message || "Unexpected error occurred",
             };
         }
     }
