@@ -26,7 +26,7 @@ export default class AwsRouter {
         this.router.get("/getZabbixStatus/:keyId", authMiddleware(), AwsController.getZabbixStatus)
         // this.router.get("/getZabbixStatusFromDB/:keyId", authMiddleware(), AwsController.getZabbixStatusFromDB)
         this.router.post("/addSshKey", adminAuthMiddleware(), upload.single("upload"), AdminController.addSshKey)
-        this.router.get("/getSshKey", adminAuthMiddleware(), AdminController.getSshKey)
+        this.router.get("/getSshKey", authMiddleware(), AdminController.getSshKey)
         this.router.delete("/deleteSshKey/:id", adminAuthMiddleware(), AdminController.deleteSshKey)
 
 

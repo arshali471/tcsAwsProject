@@ -36,3 +36,13 @@ if (!fs.existsSync(CONFIG.uploadsFolderPath)) {
 } else {
     console.log("Uploads folders exists");
 }
+
+console.log(CONFIG.agentStatusFolderPath, "CONFIG.agentStatusFolderPath");
+
+if (!fs.existsSync(CONFIG.agentStatusFolderPath)) {
+    fs.mkdir(CONFIG.agentStatusFolderPath, () => {
+        console.log("agent status folder created");
+    })
+} else {
+    console.log("Agent status folders exists");
+}

@@ -26,11 +26,13 @@ export const CONFIG = {
     encKey: process.env.ENCRYPTION_SECRET,
     sigKey: process.env.SIGNING_SECRET,
     masterKey: process.env.MASTER_KEY,
+    awsS3BucketName: process.env.AWS_S3_BUCKET_NAME,
     aws: {
         region: process.env.region,
         accessKeyId: process.env.accessKeyId,
         secretAccessKey: process.env.secretAccessKey
     },
     uploadsFolderPath: path.resolve(__dirname, '../../uploads'),
-    sshKeyFolderPath: path.resolve(__dirname, '../../ssh-key')
+    sshKeyFolderPath: path.resolve(__dirname, '../../ssh-key'),
+    agentStatusFolderPath: path.resolve(__dirname, '../../agent-status'),
 }

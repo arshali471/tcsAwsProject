@@ -1071,6 +1071,171 @@ export class AWSStatusCheckService {
 
 
 
+    static async getAllInstanceDetailsWithNginxStatusToSaveInS3(
+        keyId: any,
+        sshUsername: string,
+        privateKeyRelativePath: string,
+        operatingSystem: string
+    ) {
+        try {
+            const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
+            const ec2Client = new EC2Client(awsConfig);
+            const data: any = await ec2Client.send(new DescribeInstancesCommand({}));
+            const instances = data.Reservations.flatMap((res: any) => res.Instances);
+
+            const results: any[] = [];
+            const privateKeyPath = await SSHKeyService.getSSHkeyById(privateKeyRelativePath);
+            if (!privateKeyPath) {
+                throw new Error("Private key not found");
+            }
+
+            const privateKey = privateKeyPath.sshkey;
+
+            const filteredInstances = instances.filter((instance: any) => {
+                const isRunning = instance.State?.Name === "running";
+                const tags = instance.Tags || [];
+                const osTag = tags.find((tag: any) => tag.Key === "Operating_System");
+
+                return (
+                    isRunning &&
+                    osTag &&
+                    osTag.Value.toLowerCase().includes(operatingSystem.toLowerCase()) &&
+                    instance.Platform !== "windows"
+                );
+            });
+
+            if (filteredInstances.length === 0) {
+                return {
+                    message: `No running instance found with provided operating system ${operatingSystem}`,
+                    operatingSystem,
+                    error: true,
+                    success: false
+                };
+            }
+
+            for (const instance of filteredInstances) {
+                const privateIp = instance.PrivateIpAddress;
+
+                const instanceName = instance.Tags?.find((tag: any) => tag.Key === "Name")?.Value || "Unknown";
+                const osTag = instance.Tags?.find((tag: any) => tag.Key === "Operating_System")?.Value || "Unknown";
+                const platform = instance.PlatformDetails || "Unknown";
+                const state = instance.State?.Name || "Unknown";
+                const instanceId = instance.InstanceId;
+
+                const baseResult: any = {
+                    instanceName,
+                    instanceId,
+                    ip: privateIp || "N/A",
+                    os: osTag,
+                    platform,
+                    state,
+                    services: {
+                        zabbixAgent: "error",
+                        crowdStrike: "error",
+                        qualys: "error",
+                        cloudWatch: "error",
+                    },
+                    versions: {
+                        zabbixAgent: "N/A",
+                        crowdStrike: "N/A",
+                        qualys: "N/A",
+                        cloudWatch: "N/A"
+                    },
+                    error: null
+                };
+
+                if (!privateIp) {
+                    baseResult.error = "No private IP";
+                    results.push(baseResult);
+                    continue;
+                }
+
+                const ssh = new NodeSSH();
+
+                try {
+                    await ssh.connect({
+                        host: privateIp,
+                        username: sshUsername,
+                        privateKey,
+                    });
+
+                    console.log(`✅ SSH connected to ${privateIp} (${instanceId})`);
+
+                    const servicesToCheck = [
+                        {
+                            service: "zabbix-agent2",
+                            displayName: "zabbixAgent",
+                            versionCmd: `zabbix_agent2 --version | head -n1 | awk '{print $3}'`
+                        },
+                        {
+                            service: "falcon-sensor",
+                            displayName: "crowdStrike",
+                            versionCmd: `sudo -n /opt/CrowdStrike/falconctl -g --version | awk -F'= ' '{print $2}'`
+                        },
+                        {
+                            service: "qualys-cloud-agent",
+                            displayName: "qualys",
+                            versionCmd: `sudo -n cat /var/log/qualys/qualys-cloud-agent.log | grep "Current Agent Version" | head -n1 | sed -n 's/.*Current Agent Version : \\(.*\\) Available.*/\\1/p'`
+                        },
+                        {
+                            service: "amazon-cloudwatch-agent",
+                            displayName: "cloudWatch",
+                            versionCmd: `/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a status | grep -i version | awk -F'"' '{print $4}'`
+                        },
+                    ];
+
+                    for (const { service, displayName, versionCmd } of servicesToCheck) {
+                        const statusResult = await ssh.execCommand(`systemctl is-active ${service}`);
+                        const versionResult = await ssh.execCommand(versionCmd);
+
+                        baseResult.services[displayName] =
+                            statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
+
+                        const rawVersion = versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
+                        if (rawVersion !== "Unknown" && !isNaN(parseFloat(rawVersion))) {
+                            baseResult.versions[displayName] = parseFloat(rawVersion).toFixed(2);
+                        } else {
+                            baseResult.versions[displayName] = "Unknown";
+                        }
+                    }
+
+                } catch (sshErr: any) {
+                    baseResult.error = `SSH Error: ${sshErr.message}`;
+                } finally {
+                    ssh.dispose();
+                }
+
+                results.push(baseResult);
+            }
+
+            // const statusRecord = results.map((result: any) => ({
+            //     ...result,
+            //     awsKeyId: keyId,
+            // }));
+
+            // await StatusRecordDao.addStatusRecord(statusRecord);
+
+            return {
+                success: true,
+                data: results,
+                operatingSystem,
+                environment: awsConfig.enviroment,
+                totalInstances: results.length,
+                results
+            };
+
+        } catch (err) {
+            console.error("Error fetching instance details or checking status:", err);
+            return {
+                success: false,
+                message: (err as Error).message || "Unexpected error occurred",
+            };
+        }
+    }
+
+
+
+
 
 }
 
