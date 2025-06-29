@@ -3,9 +3,9 @@ import { CronController } from "../../controllers/cronController";
 
 
 
-console.log("🕒 Registering cron job to run every day at 1 AM...");
-// // Runs every day at 1 AM
-cron.schedule("0 1 * * *", async () => {
+
+console.log("🕒 Registering cron job to run every 6 hours...");
+cron.schedule("0 */6 * * *", async () => {
     const runTime = new Date().toISOString();
     console.log(`⏰ Cron job started at ${runTime}`);
     await CronController.getAllInstance();
