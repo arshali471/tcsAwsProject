@@ -1,4 +1,0 @@
-"instanceName","instanceId","ip","os","platform","state","zabbixAgentStatus","crowdStrikeStatus","qualysStatus","cloudWatchStatus","zabbixAgentVersion","crowdStrikeVersion","qualysVersion","cloudWatchVersion","error"
-"MajorDomo-PoC","i-02c4b6c364c1f0946","10.35.56.124","Rocky","Linux/UNIX","running","error","error","error","error","N/A","N/A","N/A","N/A","SSH Error: Timed out while waiting for handshake"
-"eks-sandbox","i-0cdaa1fe8d4d15357","10.35.59.61","Rocky Linux","Linux/UNIX","running","error","error","error","error","N/A","N/A","N/A","N/A","SSH Error: Timed out while waiting for handshake"
-"1302234-server","i-08de26d69cc010808","10.35.58.225","Ubuntu","Linux/UNIX","running","error","error","error","error","N/A","N/A","N/A","N/A","SSH Error: Timed out while waiting for handshake"
