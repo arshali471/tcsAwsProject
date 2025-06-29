@@ -4,3 +4,4 @@ build
 uploads
 .cache
 ssh-key
+agent-status
