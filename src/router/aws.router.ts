@@ -21,6 +21,7 @@ export default class AwsRouter {
         // EC2
         this.router.get('/getAllInstance/:keyId', authMiddleware(), AwsController.getAllInstance);
         this.router.get("/getInstanceDetailsByInstanceId/:instanceId/:keyId", authMiddleware(), AwsController.getInstanceDetailsByInstanceId)
+        this.router.get("/getInstanceDetailsByGlobalSearch/:ip", authMiddleware(), AwsController.getInstanceDetailsByGlobalSearch)
 
         // Check the zabbix-status
         this.router.get("/getZabbixStatus/:keyId", authMiddleware(), AwsController.getZabbixStatus)

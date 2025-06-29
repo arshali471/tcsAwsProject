@@ -9,14 +9,17 @@ export class EC2InstanceService {
     static async getAllInstanceDetails(keyId: any) {
         try {
             const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
+            const environment = String(awsConfig.enviroment);
             const ec2Client = new EC2Client(awsConfig);
             const data: any = await ec2Client.send(new DescribeInstancesCommand({}));
 
-            const instances = [];
+            const instances: any = [];
             if (data.Reservations) {
                 for (const reservation of data.Reservations) {
                     if (reservation.Instances) {
-                        instances.push(...reservation.Instances);
+                        reservation.Instances.forEach((instance: any) => {
+                            instances.push({ ...instance, environment });
+                        });
                     }
                 }
             }

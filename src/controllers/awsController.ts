@@ -89,9 +89,9 @@ export class AwsController {
             if (startDate != undefined && endDate != undefined) {
                 const data = await AWSStatusCheckService.getZabbixStatusFromDB(keyId, startDate, endDate, operatingSystem);
                 if (!data) {
-                    return res.status(404).send({results: data})
+                    return res.status(404).send({ results: data })
                 }
-                return res.status(200).json({results: data});
+                return res.status(200).json({ results: data });
             }
 
             const data = await AWSStatusCheckService.getAllInstanceDetailsWithNginxStatus(keyId, sshUsername, sshKeyPath, operatingSystem);
@@ -120,5 +120,36 @@ export class AwsController {
     //         next(err);
     //     }
     // }
+
+    static async getInstanceDetailsByGlobalSearch(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const ip = req.params.ip;
+            const awsConfig: any = await AWSKeyService.getAllAWSKeyId();
+            const matchedInstances: any[] = [];
+
+            for (const key of awsConfig) {
+                const keyId = key._id;
+                const environment = String(key.enviroment);
+
+                const data = await EC2InstanceService.getAllInstanceDetails(keyId);
+                data.forEach((item: any) => {
+                    if (item.PrivateIpAddress === ip || item.PublicIpAddress === ip) {
+                        matchedInstances.push({ ...item, environment });
+                    }
+                });
+            }
+
+            if (res) {
+                return res.status(200).json({ matchedInstances });
+            } else {
+                return matchedInstances;
+            }
+
+        } catch (err) {
+            console.error("❌ Error searching instance by IP:", err);
+            if (next) next(err);
+        }
+    }
+
 
 }
