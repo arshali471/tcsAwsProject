@@ -10,14 +10,20 @@ export class EC2InstanceService {
         try {
             const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
             const ec2Client = new EC2Client(awsConfig);
-            // Create an EC2 service object
             const data: any = await ec2Client.send(new DescribeInstancesCommand({}));
-            const intances = data.Reservations.map((data: any) => {
-                return data.Instances[0]
-            })
-            return intances;
+
+            const instances = [];
+            if (data.Reservations) {
+                for (const reservation of data.Reservations) {
+                    if (reservation.Instances) {
+                        instances.push(...reservation.Instances);
+                    }
+                }
+            }
+
+            return instances;
         } catch (err) {
-            console.error("Error fetching bucket details:", err);
+            console.error("Error fetching instance details:", err);
             throw err;
         }
     }
@@ -27,7 +33,7 @@ export class EC2InstanceService {
             const params = {
                 InstanceIds: [instanceId]
             };
-            const awsConfig = await AWSKeyService.getAWSKeyById(keyId); 
+            const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
             const ec2Client = new EC2Client(awsConfig);
             const command = new DescribeInstancesCommand(params);
             const response: any = await ec2Client.send(command);
@@ -35,7 +41,7 @@ export class EC2InstanceService {
         } catch (err) {
             console.error("Error fetching EC2 instance details:", err);
             throw err;
-        } 
+        }
     }
 
     static async saveInstanceDetails(data: any, environment: any) {

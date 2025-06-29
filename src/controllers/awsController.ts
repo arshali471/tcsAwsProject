@@ -25,7 +25,7 @@ export class AwsController {
             } else if (query === "api-save-db") {
                 const data = await EC2InstanceService.getAllInstanceDetails(keyId);
                 // return res.status(200).json({data, message: "Data fetched from API"});
-                const enviromentData = data.map((item: any) => {
+                const enviromentData: any = data.map((item: any) => {
                     return {
                         ...item,
                         environment: environment
