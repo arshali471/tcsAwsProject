@@ -4,7 +4,9 @@ import { S3BucketService } from "../services/awsS3Service";
 import { EC2InstanceService } from "../services/awsEC2Service";
 import { AWSStatusCheckService } from "../services/awsEC2StatusCheckService";
 import { AWSKeyService } from "../services";
-import { start } from "repl";
+import path from "path";
+import { SshService } from "../services/sshService";
+import fs from "fs";
 
 
 export class AwsController {
@@ -150,6 +152,63 @@ export class AwsController {
             if (next) next(err);
         }
     }
+
+
+    // static async sshToInstance(req: express.Request, res: express.Response, next: express.NextFunction) {
+    //     try {
+    //         const { ip, username, sshKey } = req.body;
+    //         if (!ip || !username || !sshKey) {
+    //             return res.status(400).json({ error: 'Missing ip, username, or sshKey' });
+    //         }
+
+    //         // Instead of setting headers, save session for websocket handshake
+    //         await SshService.saveSession({ ip, username, sshKey });
+
+    //         // Serve terminal page
+    //         return res.sendFile(path.join(__dirname, '../../public/terminal.html'));
+    //     } catch (error) {
+    //         next(error);
+    //     }
+
+
+    // }
+
+    static async sshToInstance(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const { ip, username } = req.body;
+            const sshKeyFile = req.file;
+
+            if (!ip || !username || !sshKeyFile || !sshKeyFile.path) {
+                return res.status(400).json({ error: 'Missing ip, username, or sshKey file' });
+            }
+
+            const sshKey = fs.readFileSync(sshKeyFile.path, 'utf-8');
+            // Optionally delete file: fs.unlinkSync(sshKeyFile.path);
+            fs.unlinkSync(sshKeyFile.path);
+            res.json({ ip, username, sshKey });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+
+    static async getTerminalSession(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const sessionId = req.params.sessionId as string;
+            const session = SshService.sessions[sessionId];
+
+            if (!session) {
+                return res.status(404).json({ error: 'Session not found' });
+            }
+
+            // Serve terminal page with session ID
+            return res.sendFile(path.join(__dirname, '../../public/terminal.html'));
+        } catch (error) {
+            next(error);
+        }
+    }
+
+
 
 
 }

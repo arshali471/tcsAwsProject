@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>SSH Terminal</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+  </head>
+  <body style="margin:0; padding:0; height:100vh;">
+    <div id="terminal" style="width:100%; height:100%;"></div>
+    <script>
+      const term = new Terminal();
+      term.open(document.getElementById('terminal'));
+
+      const socket = new WebSocket(`ws://${location.hostname}:3100`);
+      socket.onopen = () => {
+        term.write('Connected to server...\r\n');
+        term.onData(data => socket.send(data));
+      };
+      socket.onmessage = (e) => term.write(e.data);
+    </script>
+  </body>
+</html>

@@ -53,5 +53,10 @@ export default class AwsRouter {
 
         // RDS
         this.router.get("/getRdsInstance/:keyId", authMiddleware(), AwsRDSController.getRdsInstances)
+
+
+        // SSH to instance
+        this.router.post("/ssh", upload.single("sshkey"), AwsController.sshToInstance);
+        this.router.get("/terminal/:sessionId", AwsController.getTerminalSession);
     }
 }
