@@ -5,3 +5,7 @@ uploads
 .cache
 ssh-key
 agent-status
+
+AWS_COST_API_DOCUMENTATION.md
+CLAUDE.md
+COST_DASHBOARD_SUMMARY.md

@@ -1,7 +1,6 @@
 import { S3Client, ListBucketsCommand, GetBucketLocationCommand } from "@aws-sdk/client-s3";
 import { CloudWatchClient, GetMetricDataCommand } from "@aws-sdk/client-cloudwatch";
 
-import { CONFIG } from "../config/environment";
 import { AWSKeyService } from "./awsKeyService";
 
 export class S3BucketService {
@@ -30,33 +29,46 @@ export class S3BucketService {
                 try {
                     const endDate = new Date();
                     const startDate = new Date(endDate);
-                    startDate.setDate(startDate.getDate() - 1); // Set start date to 1 day before the current date
+                    startDate.setDate(startDate.getDate() - 7); // Set start date to 7 days before to ensure we have data
+
+                    // Query multiple storage types to get complete bucket size
+                    const storageTypes = ['StandardStorage', 'IntelligentTieringFAStorage', 'IntelligentTieringIAStorage', 'StandardIAStorage', 'OneZoneIAStorage', 'ReducedRedundancyStorage', 'GlacierInstantRetrievalStorage', 'GlacierStorage', 'DeepArchiveStorage'];
+
+                    const metricQueries = storageTypes.map((storageType, index) => ({
+                        Id: `bucketSize${index}`,
+                        MetricStat: {
+                            Metric: {
+                                Namespace: 'AWS/S3',
+                                MetricName: 'BucketSizeBytes',
+                                Dimensions: [
+                                    { Name: 'BucketName', Value: bucketName },
+                                    { Name: 'StorageType', Value: storageType },
+                                ],
+                            },
+                            Period: 86400, // One day in seconds
+                            Stat: 'Average',
+                        },
+                    }));
 
                     const metricData = await cloudWatchClient.send(new GetMetricDataCommand({
                         StartTime: startDate,
                         EndTime: endDate,
-                        MetricDataQueries: [
-                            {
-                                Id: 'bucketSizeBytes',
-                                MetricStat: {
-                                    Metric: {
-                                        Namespace: 'AWS/S3',
-                                        MetricName: 'BucketSizeBytes',
-                                        Dimensions: [
-                                            { Name: 'BucketName', Value: bucketName },
-                                            { Name: 'StorageType', Value: 'StandardStorage' },
-                                        ],
-                                    },
-                                    Period: 86400, // One day in seconds
-                                    Stat: 'Average',
-                                },
-                            },
-                        ],
+                        MetricDataQueries: metricQueries,
                     }));
 
-                    size = metricData.MetricDataResults?.[0]?.Values?.[0] || 0; // Size in bytes
+                    // Sum up sizes from all storage types, taking the most recent non-zero value
+                    let totalSize = 0;
+                    metricData.MetricDataResults?.forEach((result) => {
+                        const values = result.Values || [];
+                        // Get the latest non-zero value
+                        const latestValue = values.find(v => v > 0) || 0;
+                        totalSize += latestValue;
+                    });
+
+                    size = totalSize;
                 } catch (error: any) {
-                    size = { error: error.message };
+                    console.error(`Error fetching size for bucket ${bucketName}:`, error.message);
+                    size = 0; // Default to 0 instead of error object
                 }
 
                 return { bucketName, creationDate, location, size };

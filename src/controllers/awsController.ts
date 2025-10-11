@@ -61,11 +61,29 @@ export class AwsController {
             const keyId = req.params.keyId;
             await S3BucketService.getBucketDetails(keyId)
                 .then((bucketDetails: any) => {
-                    const formattedDetails = bucketDetails.map((bucket: any) => ({
-                        ...bucket,
-                        creationDate: bucket.creationDate ? DateTime.fromJSDate(bucket.creationDate).toISODate() : 'Unknown',
-                        size: `${(bucket.size / 1024 / 1024 / 1024).toFixed(2)} GB` // Convert bytes to GB
-                    }));
+                    const formattedDetails = bucketDetails.map((bucket: any) => {
+                        // Handle size formatting with proper error handling
+                        let sizeFormatted = 'N/A';
+                        let sizeBytes = 0;
+
+                        if (typeof bucket.size === 'number') {
+                            sizeBytes = bucket.size;
+                            if (sizeBytes === 0) {
+                                sizeFormatted = '0.00 GB (Empty or no data)';
+                            } else {
+                                sizeFormatted = `${(sizeBytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+                            }
+                        } else if (bucket.size && bucket.size.error) {
+                            sizeFormatted = `Error: ${bucket.size.error}`;
+                        }
+
+                        return {
+                            ...bucket,
+                            creationDate: bucket.creationDate ? DateTime.fromJSDate(bucket.creationDate).toISODate() : 'Unknown',
+                            size: sizeFormatted,
+                            sizeBytes: sizeBytes // Include raw bytes for sorting/filtering
+                        };
+                    });
                     res.send(formattedDetails);
                 })
                 .catch(err => {

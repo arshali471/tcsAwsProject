@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/AuthMiddleware';
 import { AwsEKSController } from '../controllers/awsEKSController';
 import { AwsRDSController } from '../controllers/awsRDSController';
 import { AwsVolumesController } from '../controllers/awsVolumesController';
+import { AwsCostController } from '../controllers/awsCostController';
 import { adminAuthMiddleware } from '../middleware/AdminAuthMiddleware';
 import { AdminController } from '../controllers/adminController';
 import { upload } from '../helper/fileUploader';
@@ -54,6 +55,14 @@ export default class AwsRouter {
         // RDS
         this.router.get("/getRdsInstance/:keyId", authMiddleware(), AwsRDSController.getRdsInstances)
 
+        // Cost Analysis & Dashboard
+        this.router.get("/cost/dashboard/:keyId", authMiddleware(), AwsCostController.getCostDashboard)
+        this.router.get("/cost/by-service/:keyId", authMiddleware(), AwsCostController.getCostByService)
+        this.router.get("/cost/by-resource/:keyId", authMiddleware(), AwsCostController.getCostByResource)
+        this.router.get("/cost/ec2-instances/:keyId", authMiddleware(), AwsCostController.getEC2InstanceCosts)
+        this.router.get("/cost/forecast/:keyId", authMiddleware(), AwsCostController.getCostForecast)
+        this.router.get("/cost/compare/:keyId", authMiddleware(), AwsCostController.compareCosts)
+        this.router.get("/cost/top-services/:keyId", authMiddleware(), AwsCostController.getTopServices)
 
         // SSH to instance
         this.router.post("/ssh", upload.single("sshkey"), AwsController.sshToInstance);
