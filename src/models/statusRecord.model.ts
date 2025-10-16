@@ -74,8 +74,8 @@ if (!encKey || !sigKey) {
 }
 
 statusRecordSchema.plugin(mongooseEncryption, {
-    encryptionKey: Buffer.from(encKey, "base64"),
-    signingKey: Buffer.from(sigKey, "base64"),
+    encryptionKey: encKey,
+    signingKey: sigKey,
     encryptedFields: [
         "instanceName",
         "instanceId",

@@ -43,8 +43,8 @@ const AWSKeySchema = new Schema<IAWSKey>({
 
 // 🔐 Encrypt all fields except _id
 AWSKeySchema.plugin(mongooseEncryption, {
-    encryptionKey: Buffer.from(encKey, "base64"),
-    signingKey: Buffer.from(sigKey, "base64"),
+    encryptionKey: encKey,
+    signingKey: sigKey,
     encryptedFields: [
         "region",
         "accessKeyId",

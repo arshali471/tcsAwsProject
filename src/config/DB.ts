@@ -12,12 +12,8 @@ interface connectOptions {
     useNewUrlParser: Boolean;
 };
 
-const connectOptions: mongoose.ConnectionOptions = {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    useCreateIndex: true,
-    useFindAndModify: false
-};
+// Mongoose 8 removed these options as they are now defaults
+const connectOptions = {};
 
 
 export class DB {

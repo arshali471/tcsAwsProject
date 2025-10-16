@@ -7,7 +7,7 @@ import { CONFIG } from "../config/environment";
 import { Parser } from 'json2csv';
 import fs from 'fs';
 import path from 'path';
-import AWS from 'aws-sdk';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 export class CronController {
     // static async getAllInstance(req?: express.Request, res?: express.Response, next?: express.NextFunction) {
@@ -262,7 +262,8 @@ export class CronController {
                 if (res) return res.status(500).json({ message: "Master key is not defined." });
             }
 
-            const s3 = new AWS.S3();
+            // Initialize S3 client with AWS SDK v3
+            const s3Client = new S3Client({});
 
             for (const key of awsConfig) {
                 const keyId = key._id;
@@ -330,13 +331,14 @@ export class CronController {
 
                 console.log(`✅ CSV file created for ${environment} at ${filePath}`);
 
-                const uploadParams = {
+                // Upload to S3 using AWS SDK v3
+                const uploadCommand = new PutObjectCommand({
                     Bucket: CONFIG.awsS3BucketName!,
                     Key: `agent-status-reports/${environment}/${fileName}`,
-                    Body: fs.createReadStream(filePath)
-                };
+                    Body: fs.readFileSync(filePath)
+                });
 
-                await s3.upload(uploadParams).promise();
+                await s3Client.send(uploadCommand);
                 console.log(`✅ CSV uploaded to S3 for environment ${environment}`);
             }
 

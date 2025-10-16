@@ -46,8 +46,8 @@ const SSHKeySchema = new Schema<ISSHKey>({
 
 // 🔐 Encrypt all fields except _id
 SSHKeySchema.plugin(mongooseEncryption, {
-    encryptionKey: Buffer.from(encKey, "base64"),
-    signingKey: Buffer.from(sigKey, "base64"),
+    encryptionKey: encKey,
+    signingKey: sigKey,
     encryptedFields: [
         "sshKeyName",
         "sshkey",

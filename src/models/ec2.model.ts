@@ -261,8 +261,8 @@ console.log("Encryption key length:", Buffer.from(encKey, 'base64').length); // 
 console.log("Signing key length:", Buffer.from(sigKey, 'base64').length);     // should be 64
 
 EC2Schema.plugin(mongooseEncryption, {
-  encryptionKey: Buffer.from(encKey, "base64"),
-  signingKey: Buffer.from(sigKey, "base64"),
+  encryptionKey: encKey,
+  signingKey: sigKey,
   encryptedFields: [
     "AmiLaunchIndex",
     "ImageId",
