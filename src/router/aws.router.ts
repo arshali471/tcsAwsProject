@@ -24,7 +24,18 @@ export default class AwsRouter {
         this.router.get("/getInstanceDetailsByInstanceId/:instanceId/:keyId", authMiddleware(), AwsController.getInstanceDetailsByInstanceId)
         this.router.get("/getInstanceDetailsByGlobalSearch/:ip", authMiddleware(), AwsController.getInstanceDetailsByGlobalSearch)
 
-        // Check the zabbix-status
+        // NEW: Get all EC2 instances from all regions/environments
+        this.router.get("/getAllInstancesFromAllRegions", authMiddleware(), AwsController.getAllInstancesFromAllRegions)
+        this.router.get("/exportAllInstancesToExcel", authMiddleware(), AwsController.exportAllInstancesToExcel)
+
+        // NEW: Get all EKS EC2 instances from all regions/environments
+        this.router.get("/getAllEKSEC2InstancesFromAllRegions", authMiddleware(), AwsController.getAllEKSEC2InstancesFromAllRegions)
+        this.router.get("/exportAllEKSInstancesToExcel", authMiddleware(), AwsController.exportAllEKSInstancesToExcel)
+
+        // Agent Status Dashboard (NEW - auto-fetch from DB, no inputs needed)
+        this.router.get("/getAgentStatusDashboard/:keyId", authMiddleware(), AwsController.getAgentStatusDashboard)
+
+        // Check the zabbix-status (OLD - requires sshUsername, sshKeyPath, operatingSystem)
         this.router.get("/getZabbixStatus/:keyId", authMiddleware(), AwsController.getZabbixStatus)
         // this.router.get("/getZabbixStatusFromDB/:keyId", authMiddleware(), AwsController.getZabbixStatusFromDB)
         this.router.post("/addSshKey", adminAuthMiddleware(), upload.single("upload"), AdminController.addSshKey)

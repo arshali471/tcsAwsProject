@@ -1062,15 +1062,6 @@ export class AWSStatusCheckService {
         }
     }
 
-
-
-    static async getZabbixStatusFromDB(keyId: any, startDate: any, endDate: any, operatingSystem: any) {
-        return await StatusRecordDao.getZabbixStatusFromDB(keyId, startDate, endDate, operatingSystem);
-    }
-
-
-
-
     static async getAllInstanceDetailsWithNginxStatusToSaveInS3(
         keyId: any,
         sshUsername: string,
@@ -1233,9 +1224,45 @@ export class AWSStatusCheckService {
         }
     }
 
+    /**
+     * Get agent status dashboard with statistics
+     * Fetches all latest agent status records from DB for a given AWS key
+     * Supports optional date range filtering
+     */
+    static async getAgentStatusDashboard(keyId: string, startDate?: string, endDate?: string) {
+        try {
+            const dashboardData = await StatusRecordDao.getAgentStatusDashboardStats(keyId, startDate, endDate);
+            return {
+                success: true,
+                data: dashboardData
+            };
+        } catch (err) {
+            console.error("❌ Error fetching agent status dashboard:", err);
+            return {
+                success: false,
+                message: (err as Error).message || "Failed to fetch agent status dashboard"
+            };
+        }
+    }
 
-
-
+    /**
+     * Get Zabbix status from DB (existing method, kept for compatibility)
+     */
+    static async getZabbixStatusFromDB(keyId: string, startDate: string, endDate: string, operatingSystem: string) {
+        try {
+            const records = await StatusRecordDao.getZabbixStatusFromDB(keyId, startDate, endDate, operatingSystem);
+            return {
+                success: true,
+                data: records
+            };
+        } catch (err) {
+            console.error("❌ Error fetching Zabbix status from DB:", err);
+            return {
+                success: false,
+                message: (err as Error).message || "Failed to fetch Zabbix status"
+            };
+        }
+    }
 
 }
 

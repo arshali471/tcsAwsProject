@@ -47,4 +47,12 @@ export class AWSKeyDao {
     static async getAllAWSKeyId() {
         return await awsKeysModel.find({}, "-secretAccessKey  -createdAt -updatedAt -createdBy -updatedBy -accessKeyId");
     }
+
+    /**
+     * Get all AWS keys WITH credentials (for internal service use only)
+     * Returns decrypted accessKeyId and secretAccessKey
+     */
+    static async getAllAWSKeyWithCredentials() {
+        return await awsKeysModel.find({});
+    }
 }
