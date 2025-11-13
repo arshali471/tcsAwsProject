@@ -1,3 +1,41 @@
+// import mongoose from 'mongoose';
+// import { IServer } from '../lib/interfaces';
+// import dotenv from 'dotenv';
+// import { CONFIG } from './environment';
+// dotenv.config();
+
+// interface connectOptions {
+//     autoReconnect: boolean;
+//     loggerLevel?: string;
+//     reconnectTries: number; // Never stop trying to reconnect
+//     reconnectInterval: number;
+//     useNewUrlParser: Boolean;
+// };
+
+// // Mongoose 8 removed these options as they are now defaults
+// const connectOptions = {};
+
+
+// export class DB {
+//     static async connect(server?: IServer) {
+//         try {
+//             console.log("Connecting to DB");
+//             await mongoose.connect(
+//                 CONFIG.DB_CONNECTION_STRING!, 
+//                 connectOptions
+//             );
+//             if (server) {
+//                 server.isDbConnected = true;                
+//             }
+//             console.log('Connected to DB');            
+//         }
+//         catch (error) {
+//             throw error;
+//         }
+//     }
+// }
+
+
 import mongoose from 'mongoose';
 import { IServer } from '../lib/interfaces';
 import dotenv from 'dotenv';
