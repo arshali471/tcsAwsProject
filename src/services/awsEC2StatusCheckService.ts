@@ -986,10 +986,13 @@ export class AWSStatusCheckService {
                 const ssh = new NodeSSH();
 
                 try {
+                    // Add timeout to SSH connection to fail fast if unreachable
                     await ssh.connect({
                         host: privateIp,
                         username: sshUsername,
                         privateKey,
+                        readyTimeout: 10000,  // 10 seconds timeout for connection ready
+                        timeout: 15000,       // 15 seconds overall timeout
                     });
 
                     console.log(`✅ SSH connected to ${privateIp} (${instanceId})`);
@@ -998,27 +1001,27 @@ export class AWSStatusCheckService {
                         {
                             service: "zabbix-agent2",
                             displayName: "zabbixAgent",
-                            versionCmd: `zabbix_agent2 --version | head -n1 | awk '{print $3}'`
+                            versionCmd: `(zabbix_agent2 --version 2>/dev/null || /usr/sbin/zabbix_agent2 --version 2>/dev/null || /usr/bin/zabbix_agent2 --version 2>/dev/null) | head -n1 | awk '{print $3}' || echo "N/A"`
                         },
                         {
                             service: "falcon-sensor",
                             displayName: "crowdStrike",
-                            versionCmd: `sudo -n /opt/CrowdStrike/falconctl -g --version | awk -F'= ' '{print $2}'`
+                            versionCmd: `sudo -n /opt/CrowdStrike/falconctl -g --version 2>/dev/null | awk -F'= ' '{print $2}' || echo "N/A"`
                         },
                         {
                             service: "qualys-cloud-agent",
                             displayName: "qualys",
-                            versionCmd: `sudo -n cat /var/log/qualys/qualys-cloud-agent.log | grep "Current Agent Version" | head -n1 | sed -n 's/.*Current Agent Version : \\(.*\\) Available.*/\\1/p'`
+                            versionCmd: `sudo -n cat /var/log/qualys/qualys-cloud-agent.log 2>/dev/null | grep "Current Agent Version" | tail -n1 | sed -n 's/.*Current Agent Version : \\(.*\\) Available.*/\\1/p' || echo "N/A"`
                         },
                         {
                             service: "amazon-cloudwatch-agent",
                             displayName: "cloudWatch",
-                            versionCmd: `/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a status | grep -i version | awk -F'"' '{print $4}'`
+                            versionCmd: `/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a status 2>/dev/null | grep -i version | awk -F'"' '{print $4}' || echo "N/A"`
                         },
                         {
                             service: "alloy",
                             displayName: "alloy",
-                            versionCmd: `alloy --version 2>&1 | head -n1 | grep -oP 'v?\\d+\\.\\d+\\.\\d+' | head -n1 | sed 's/^v//'`
+                            versionCmd: `(alloy --version 2>/dev/null || /usr/bin/alloy --version 2>/dev/null || /usr/local/bin/alloy --version 2>/dev/null) | head -n1 | grep -oP 'v?\\d+\\.\\d+\\.\\d+' | head -n1 | sed 's/^v//' || echo "N/A"`
                         },
                     ];
 
@@ -1038,6 +1041,7 @@ export class AWSStatusCheckService {
                     }
 
                 } catch (sshErr: any) {
+                    console.log(`❌ SSH failed for ${privateIp} (${instanceId}): ${sshErr.message}`);
                     baseResult.error = `SSH Error: ${sshErr.message}`;
                 } finally {
                     ssh.dispose();
@@ -1153,10 +1157,13 @@ export class AWSStatusCheckService {
                 const ssh = new NodeSSH();
 
                 try {
+                    // Add timeout to SSH connection to fail fast if unreachable
                     await ssh.connect({
                         host: privateIp,
                         username: sshUsername,
                         privateKey,
+                        readyTimeout: 10000,  // 10 seconds timeout for connection ready
+                        timeout: 15000,       // 15 seconds overall timeout
                     });
 
                     console.log(`✅ SSH connected to ${privateIp} (${instanceId})`);
@@ -1165,27 +1172,27 @@ export class AWSStatusCheckService {
                         {
                             service: "zabbix-agent2",
                             displayName: "zabbixAgent",
-                            versionCmd: `zabbix_agent2 --version | head -n1 | awk '{print $3}'`
+                            versionCmd: `(zabbix_agent2 --version 2>/dev/null || /usr/sbin/zabbix_agent2 --version 2>/dev/null || /usr/bin/zabbix_agent2 --version 2>/dev/null) | head -n1 | awk '{print $3}' || echo "N/A"`
                         },
                         {
                             service: "falcon-sensor",
                             displayName: "crowdStrike",
-                            versionCmd: `sudo -n /opt/CrowdStrike/falconctl -g --version | awk -F'= ' '{print $2}'`
+                            versionCmd: `sudo -n /opt/CrowdStrike/falconctl -g --version 2>/dev/null | awk -F'= ' '{print $2}' || echo "N/A"`
                         },
                         {
                             service: "qualys-cloud-agent",
                             displayName: "qualys",
-                            versionCmd: `sudo -n cat /var/log/qualys/qualys-cloud-agent.log | grep "Current Agent Version" | head -n1 | sed -n 's/.*Current Agent Version : \\(.*\\) Available.*/\\1/p'`
+                            versionCmd: `sudo -n cat /var/log/qualys/qualys-cloud-agent.log 2>/dev/null | grep "Current Agent Version" | tail -n1 | sed -n 's/.*Current Agent Version : \\(.*\\) Available.*/\\1/p' || echo "N/A"`
                         },
                         {
                             service: "amazon-cloudwatch-agent",
                             displayName: "cloudWatch",
-                            versionCmd: `/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a status | grep -i version | awk -F'"' '{print $4}'`
+                            versionCmd: `/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a status 2>/dev/null | grep -i version | awk -F'"' '{print $4}' || echo "N/A"`
                         },
                         {
                             service: "alloy",
                             displayName: "alloy",
-                            versionCmd: `alloy --version 2>&1 | head -n1 | grep -oP 'v?\\d+\\.\\d+\\.\\d+' | head -n1 | sed 's/^v//'`
+                            versionCmd: `(alloy --version 2>/dev/null || /usr/bin/alloy --version 2>/dev/null || /usr/local/bin/alloy --version 2>/dev/null) | head -n1 | grep -oP 'v?\\d+\\.\\d+\\.\\d+' | head -n1 | sed 's/^v//' || echo "N/A"`
                         },
                     ];
 
@@ -1205,6 +1212,7 @@ export class AWSStatusCheckService {
                     }
 
                 } catch (sshErr: any) {
+                    console.log(`❌ SSH failed for ${privateIp} (${instanceId}): ${sshErr.message}`);
                     baseResult.error = `SSH Error: ${sshErr.message}`;
                 } finally {
                     ssh.dispose();
