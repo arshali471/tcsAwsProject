@@ -1018,7 +1018,7 @@ export class AWSStatusCheckService {
                         {
                             service: "alloy",
                             displayName: "alloy",
-                            versionCmd: `alloy --version 2>&1 | head -n1 | awk '{print $3}'`
+                            versionCmd: `alloy --version 2>&1 | head -n1 | grep -oP 'v?\\d+\\.\\d+\\.\\d+' | head -n1 | sed 's/^v//'`
                         },
                     ];
 
@@ -1033,7 +1033,7 @@ export class AWSStatusCheckService {
                         if (rawVersion !== "Unknown" && !isNaN(parseFloat(rawVersion))) {
                             baseResult.versions[displayName] = parseFloat(rawVersion).toFixed(2);
                         } else {
-                            baseResult.versions[displayName] = "Unknown";
+                            baseResult.versions[displayName] = rawVersion !== "Unknown" ? rawVersion : "Unknown";
                         }
                     }
 
@@ -1185,7 +1185,7 @@ export class AWSStatusCheckService {
                         {
                             service: "alloy",
                             displayName: "alloy",
-                            versionCmd: `alloy --version 2>&1 | head -n1 | awk '{print $3}'`
+                            versionCmd: `alloy --version 2>&1 | head -n1 | grep -oP 'v?\\d+\\.\\d+\\.\\d+' | head -n1 | sed 's/^v//'`
                         },
                     ];
 
@@ -1200,7 +1200,7 @@ export class AWSStatusCheckService {
                         if (rawVersion !== "Unknown" && !isNaN(parseFloat(rawVersion))) {
                             baseResult.versions[displayName] = parseFloat(rawVersion).toFixed(2);
                         } else {
-                            baseResult.versions[displayName] = "Unknown";
+                            baseResult.versions[displayName] = rawVersion !== "Unknown" ? rawVersion : "Unknown";
                         }
                     }
 
@@ -1276,7 +1276,7 @@ export class AWSStatusCheckService {
             const operatingSystems: any = {
                 "awx": ["rocky"],
                 "centos": ["centos"],
-                "ec2-user": ["amazon linux", "suse"],
+                "ec2-user": ["amazon", "suse"],  // Changed to "amazon" to match both "Amazon_Linux" and "Amazon Linux"
                 "ubuntu": ["ubuntu"],
             };
 
