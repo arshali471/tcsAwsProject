@@ -906,7 +906,8 @@ export class AWSStatusCheckService {
         keyId: any,
         sshUsername: string,
         privateKeyRelativePath: string,
-        operatingSystem: string
+        operatingSystem: string,
+        windowsPassword?: string
     ) {
         try {
             const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
@@ -930,8 +931,8 @@ export class AWSStatusCheckService {
                 return (
                     isRunning &&
                     osTag &&
-                    osTag.Value.toLowerCase().includes(operatingSystem.toLowerCase()) &&
-                    instance.Platform !== "windows"
+                    osTag.Value.toLowerCase().includes(operatingSystem.toLowerCase())
+                    // Removed Windows exclusion to support Windows servers
                 );
             });
 
@@ -986,51 +987,114 @@ export class AWSStatusCheckService {
                 const ssh = new NodeSSH();
 
                 try {
+                    // Detect if it's a Windows or Linux instance
+                    const isWindows = instance.Platform === "windows" || osTag.toLowerCase().includes("windows");
+
                     // Add timeout to SSH connection to fail fast if unreachable
-                    await ssh.connect({
+                    const sshConfig: any = {
                         host: privateIp,
                         username: sshUsername,
-                        privateKey,
                         readyTimeout: 10000,  // 10 seconds timeout for connection ready
                         timeout: 15000,       // 15 seconds overall timeout
-                    });
+                    };
+
+                    // Use password for Windows, private key for Linux
+                    if (isWindows && windowsPassword) {
+                        sshConfig.password = windowsPassword;
+                        console.log(`🔐 Connecting to Windows instance ${privateIp} with password authentication`);
+                    } else {
+                        sshConfig.privateKey = privateKey;
+                    }
+
+                    await ssh.connect(sshConfig);
 
                     console.log(`✅ SSH connected to ${privateIp} (${instanceId})`);
 
-                    const servicesToCheck = [
-                        {
-                            service: "zabbix-agent2",
-                            displayName: "zabbixAgent",
-                            versionCmd: `(zabbix_agent2 --version 2>/dev/null || /usr/sbin/zabbix_agent2 --version 2>/dev/null || /usr/bin/zabbix_agent2 --version 2>/dev/null) | head -n1 | awk '{print $3}' || echo "N/A"`
-                        },
-                        {
-                            service: "falcon-sensor",
-                            displayName: "crowdStrike",
-                            versionCmd: `sudo -n /opt/CrowdStrike/falconctl -g --version 2>/dev/null | awk -F'= ' '{print $2}' || echo "N/A"`
-                        },
-                        {
-                            service: "qualys-cloud-agent",
-                            displayName: "qualys",
-                            versionCmd: `sudo -n cat /var/log/qualys/qualys-cloud-agent.log 2>/dev/null | grep "Current Agent Version" | tail -n1 | sed -n 's/.*Current Agent Version : \\(.*\\) Available.*/\\1/p' || echo "N/A"`
-                        },
-                        {
-                            service: "amazon-cloudwatch-agent",
-                            displayName: "cloudWatch",
-                            versionCmd: `/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a status 2>/dev/null | grep -i version | awk -F'"' '{print $4}' || echo "N/A"`
-                        },
-                        {
-                            service: "alloy",
-                            displayName: "alloy",
-                            versionCmd: `(alloy --version 2>/dev/null || /usr/bin/alloy --version 2>/dev/null || /usr/local/bin/alloy --version 2>/dev/null) | head -n1 | grep -oP 'v?\\d+\\.\\d+\\.\\d+' | head -n1 | sed 's/^v//' || echo "N/A"`
-                        },
-                    ];
+                    let servicesToCheck: any[] = [];
 
-                    for (const { service, displayName, versionCmd } of servicesToCheck) {
-                        const statusResult = await ssh.execCommand(`systemctl is-active ${service}`);
+                    if (isWindows) {
+                        // Windows-specific service checks using PowerShell
+                        servicesToCheck = [
+                            {
+                                service: "Zabbix Agent 2",
+                                displayName: "zabbixAgent",
+                                statusCmd: `powershell -Command "try { $s = Get-Service 'Zabbix Agent 2' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
+                                versionCmd: `powershell -Command "try { $path = 'C:\\Program Files\\Zabbix Agent 2\\zabbix_agent2.exe'; if (Test-Path $path) { & $path --version 2>$null | Select-Object -First 1 | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } } } else { 'N/A' } } catch { 'N/A' }"`
+                            },
+                            {
+                                service: "CSFalconService",
+                                displayName: "crowdStrike",
+                                statusCmd: `powershell -Command "try { $s = Get-Service 'CSFalconService' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
+                                versionCmd: `powershell -Command "try { $path = 'C:\\Program Files\\CrowdStrike\\CSFalconService.exe'; if (Test-Path $path) { (Get-ItemProperty $path).VersionInfo.FileVersion } else { 'N/A' } } catch { 'N/A' }"`
+                            },
+                            {
+                                service: "QualysAgent",
+                                displayName: "qualys",
+                                statusCmd: `powershell -Command "try { $s = Get-Service 'QualysAgent' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
+                                versionCmd: `powershell -Command "try { $path = 'C:\\Program Files\\Qualys\\QualysAgent\\QualysAgent.exe'; if (Test-Path $path) { (Get-ItemProperty $path).VersionInfo.FileVersion } else { 'N/A' } } catch { 'N/A' }"`
+                            },
+                            {
+                                service: "AmazonCloudWatchAgent",
+                                displayName: "cloudWatch",
+                                statusCmd: `powershell -Command "try { $s = Get-Service 'AmazonCloudWatchAgent' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
+                                versionCmd: `powershell -Command "try { & 'C:\\Program Files\\Amazon\\AmazonCloudWatchAgent\\amazon-cloudwatch-agent-ctl.ps1' -m ec2 -a query 2>$null | Select-String -Pattern 'version' | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } } } catch { 'N/A' }"`
+                            },
+                            {
+                                service: "Alloy",
+                                displayName: "alloy",
+                                statusCmd: `powershell -Command "try { $s = Get-Service 'Alloy' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
+                                versionCmd: `powershell -Command "try { $paths = @('C:\\Program Files\\GrafanaLabs\\Alloy\\alloy.exe', 'C:\\Program Files\\Alloy\\alloy.exe'); foreach ($path in $paths) { if (Test-Path $path) { & $path --version 2>$null | Select-Object -First 1 | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } }; break } } if (-not $found) { 'N/A' } } catch { 'N/A' }"`
+                            },
+                        ];
+                    } else {
+                        // Linux-specific service checks
+                        servicesToCheck = [
+                            {
+                                service: "zabbix-agent2",
+                                displayName: "zabbixAgent",
+                                statusCmd: `systemctl is-active zabbix-agent2`,
+                                versionCmd: `(zabbix_agent2 --version 2>/dev/null || /usr/sbin/zabbix_agent2 --version 2>/dev/null || /usr/bin/zabbix_agent2 --version 2>/dev/null) | head -n1 | awk '{print $3}' || echo "N/A"`
+                            },
+                            {
+                                service: "falcon-sensor",
+                                displayName: "crowdStrike",
+                                statusCmd: `systemctl is-active falcon-sensor`,
+                                versionCmd: `sudo -n /opt/CrowdStrike/falconctl -g --version 2>/dev/null | awk -F'= ' '{print $2}' || echo "N/A"`
+                            },
+                            {
+                                service: "qualys-cloud-agent",
+                                displayName: "qualys",
+                                statusCmd: `systemctl is-active qualys-cloud-agent`,
+                                versionCmd: `sudo -n cat /var/log/qualys/qualys-cloud-agent.log 2>/dev/null | grep "Current Agent Version" | tail -n1 | sed -n 's/.*Current Agent Version : \\(.*\\) Available.*/\\1/p' || echo "N/A"`
+                            },
+                            {
+                                service: "amazon-cloudwatch-agent",
+                                displayName: "cloudWatch",
+                                statusCmd: `systemctl is-active amazon-cloudwatch-agent`,
+                                versionCmd: `/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a status 2>/dev/null | grep -i version | awk -F'"' '{print $4}' || echo "N/A"`
+                            },
+                            {
+                                service: "alloy",
+                                displayName: "alloy",
+                                statusCmd: `systemctl is-active alloy`,
+                                versionCmd: `(alloy --version 2>/dev/null || /usr/bin/alloy --version 2>/dev/null || /usr/local/bin/alloy --version 2>/dev/null) | head -n1 | grep -oP 'v?\\d+\\.\\d+\\.\\d+' | head -n1 | sed 's/^v//' || echo "N/A"`
+                            },
+                        ];
+                    }
+
+                    for (const { service, displayName, statusCmd, versionCmd } of servicesToCheck) {
+                        const statusResult = await ssh.execCommand(statusCmd || `systemctl is-active ${service}`);
                         const versionResult = await ssh.execCommand(versionCmd);
 
-                        baseResult.services[displayName] =
-                            statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
+                        // Map Windows service status to standard format
+                        let status = statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
+                        if (isWindows) {
+                            // Windows service status mapping: Running -> active, Stopped -> inactive
+                            if (status === "Running") status = "active";
+                            else if (status === "Stopped") status = "inactive";
+                            else if (status === "NotFound") status = "inactive";
+                        }
+                        baseResult.services[displayName] = status;
 
                         const rawVersion = versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
                         if (rawVersion !== "Unknown" && !isNaN(parseFloat(rawVersion))) {
@@ -1077,7 +1141,8 @@ export class AWSStatusCheckService {
         keyId: any,
         sshUsername: string,
         privateKeyRelativePath: string,
-        operatingSystem: string
+        operatingSystem: string,
+        windowsPassword?: string
     ) {
         try {
             const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
@@ -1101,8 +1166,8 @@ export class AWSStatusCheckService {
                 return (
                     isRunning &&
                     osTag &&
-                    osTag.Value.toLowerCase().includes(operatingSystem.toLowerCase()) &&
-                    instance.Platform !== "windows"
+                    osTag.Value.toLowerCase().includes(operatingSystem.toLowerCase())
+                    // Removed Windows exclusion to support Windows servers
                 );
             });
 
@@ -1157,51 +1222,114 @@ export class AWSStatusCheckService {
                 const ssh = new NodeSSH();
 
                 try {
+                    // Detect if it's a Windows or Linux instance
+                    const isWindows = instance.Platform === "windows" || osTag.toLowerCase().includes("windows");
+
                     // Add timeout to SSH connection to fail fast if unreachable
-                    await ssh.connect({
+                    const sshConfig: any = {
                         host: privateIp,
                         username: sshUsername,
-                        privateKey,
                         readyTimeout: 10000,  // 10 seconds timeout for connection ready
                         timeout: 15000,       // 15 seconds overall timeout
-                    });
+                    };
+
+                    // Use password for Windows, private key for Linux
+                    if (isWindows && windowsPassword) {
+                        sshConfig.password = windowsPassword;
+                        console.log(`🔐 Connecting to Windows instance ${privateIp} with password authentication`);
+                    } else {
+                        sshConfig.privateKey = privateKey;
+                    }
+
+                    await ssh.connect(sshConfig);
 
                     console.log(`✅ SSH connected to ${privateIp} (${instanceId})`);
 
-                    const servicesToCheck = [
-                        {
-                            service: "zabbix-agent2",
-                            displayName: "zabbixAgent",
-                            versionCmd: `(zabbix_agent2 --version 2>/dev/null || /usr/sbin/zabbix_agent2 --version 2>/dev/null || /usr/bin/zabbix_agent2 --version 2>/dev/null) | head -n1 | awk '{print $3}' || echo "N/A"`
-                        },
-                        {
-                            service: "falcon-sensor",
-                            displayName: "crowdStrike",
-                            versionCmd: `sudo -n /opt/CrowdStrike/falconctl -g --version 2>/dev/null | awk -F'= ' '{print $2}' || echo "N/A"`
-                        },
-                        {
-                            service: "qualys-cloud-agent",
-                            displayName: "qualys",
-                            versionCmd: `sudo -n cat /var/log/qualys/qualys-cloud-agent.log 2>/dev/null | grep "Current Agent Version" | tail -n1 | sed -n 's/.*Current Agent Version : \\(.*\\) Available.*/\\1/p' || echo "N/A"`
-                        },
-                        {
-                            service: "amazon-cloudwatch-agent",
-                            displayName: "cloudWatch",
-                            versionCmd: `/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a status 2>/dev/null | grep -i version | awk -F'"' '{print $4}' || echo "N/A"`
-                        },
-                        {
-                            service: "alloy",
-                            displayName: "alloy",
-                            versionCmd: `(alloy --version 2>/dev/null || /usr/bin/alloy --version 2>/dev/null || /usr/local/bin/alloy --version 2>/dev/null) | head -n1 | grep -oP 'v?\\d+\\.\\d+\\.\\d+' | head -n1 | sed 's/^v//' || echo "N/A"`
-                        },
-                    ];
+                    let servicesToCheck: any[] = [];
 
-                    for (const { service, displayName, versionCmd } of servicesToCheck) {
-                        const statusResult = await ssh.execCommand(`systemctl is-active ${service}`);
+                    if (isWindows) {
+                        // Windows-specific service checks using PowerShell
+                        servicesToCheck = [
+                            {
+                                service: "Zabbix Agent 2",
+                                displayName: "zabbixAgent",
+                                statusCmd: `powershell -Command "try { $s = Get-Service 'Zabbix Agent 2' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
+                                versionCmd: `powershell -Command "try { $path = 'C:\\Program Files\\Zabbix Agent 2\\zabbix_agent2.exe'; if (Test-Path $path) { & $path --version 2>$null | Select-Object -First 1 | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } } } else { 'N/A' } } catch { 'N/A' }"`
+                            },
+                            {
+                                service: "CSFalconService",
+                                displayName: "crowdStrike",
+                                statusCmd: `powershell -Command "try { $s = Get-Service 'CSFalconService' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
+                                versionCmd: `powershell -Command "try { $path = 'C:\\Program Files\\CrowdStrike\\CSFalconService.exe'; if (Test-Path $path) { (Get-ItemProperty $path).VersionInfo.FileVersion } else { 'N/A' } } catch { 'N/A' }"`
+                            },
+                            {
+                                service: "QualysAgent",
+                                displayName: "qualys",
+                                statusCmd: `powershell -Command "try { $s = Get-Service 'QualysAgent' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
+                                versionCmd: `powershell -Command "try { $path = 'C:\\Program Files\\Qualys\\QualysAgent\\QualysAgent.exe'; if (Test-Path $path) { (Get-ItemProperty $path).VersionInfo.FileVersion } else { 'N/A' } } catch { 'N/A' }"`
+                            },
+                            {
+                                service: "AmazonCloudWatchAgent",
+                                displayName: "cloudWatch",
+                                statusCmd: `powershell -Command "try { $s = Get-Service 'AmazonCloudWatchAgent' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
+                                versionCmd: `powershell -Command "try { & 'C:\\Program Files\\Amazon\\AmazonCloudWatchAgent\\amazon-cloudwatch-agent-ctl.ps1' -m ec2 -a query 2>$null | Select-String -Pattern 'version' | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } } } catch { 'N/A' }"`
+                            },
+                            {
+                                service: "Alloy",
+                                displayName: "alloy",
+                                statusCmd: `powershell -Command "try { $s = Get-Service 'Alloy' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
+                                versionCmd: `powershell -Command "try { $paths = @('C:\\Program Files\\GrafanaLabs\\Alloy\\alloy.exe', 'C:\\Program Files\\Alloy\\alloy.exe'); foreach ($path in $paths) { if (Test-Path $path) { & $path --version 2>$null | Select-Object -First 1 | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } }; break } } if (-not $found) { 'N/A' } } catch { 'N/A' }"`
+                            },
+                        ];
+                    } else {
+                        // Linux-specific service checks
+                        servicesToCheck = [
+                            {
+                                service: "zabbix-agent2",
+                                displayName: "zabbixAgent",
+                                statusCmd: `systemctl is-active zabbix-agent2`,
+                                versionCmd: `(zabbix_agent2 --version 2>/dev/null || /usr/sbin/zabbix_agent2 --version 2>/dev/null || /usr/bin/zabbix_agent2 --version 2>/dev/null) | head -n1 | awk '{print $3}' || echo "N/A"`
+                            },
+                            {
+                                service: "falcon-sensor",
+                                displayName: "crowdStrike",
+                                statusCmd: `systemctl is-active falcon-sensor`,
+                                versionCmd: `sudo -n /opt/CrowdStrike/falconctl -g --version 2>/dev/null | awk -F'= ' '{print $2}' || echo "N/A"`
+                            },
+                            {
+                                service: "qualys-cloud-agent",
+                                displayName: "qualys",
+                                statusCmd: `systemctl is-active qualys-cloud-agent`,
+                                versionCmd: `sudo -n cat /var/log/qualys/qualys-cloud-agent.log 2>/dev/null | grep "Current Agent Version" | tail -n1 | sed -n 's/.*Current Agent Version : \\(.*\\) Available.*/\\1/p' || echo "N/A"`
+                            },
+                            {
+                                service: "amazon-cloudwatch-agent",
+                                displayName: "cloudWatch",
+                                statusCmd: `systemctl is-active amazon-cloudwatch-agent`,
+                                versionCmd: `/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a status 2>/dev/null | grep -i version | awk -F'"' '{print $4}' || echo "N/A"`
+                            },
+                            {
+                                service: "alloy",
+                                displayName: "alloy",
+                                statusCmd: `systemctl is-active alloy`,
+                                versionCmd: `(alloy --version 2>/dev/null || /usr/bin/alloy --version 2>/dev/null || /usr/local/bin/alloy --version 2>/dev/null) | head -n1 | grep -oP 'v?\\d+\\.\\d+\\.\\d+' | head -n1 | sed 's/^v//' || echo "N/A"`
+                            },
+                        ];
+                    }
+
+                    for (const { service, displayName, statusCmd, versionCmd } of servicesToCheck) {
+                        const statusResult = await ssh.execCommand(statusCmd || `systemctl is-active ${service}`);
                         const versionResult = await ssh.execCommand(versionCmd);
 
-                        baseResult.services[displayName] =
-                            statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
+                        // Map Windows service status to standard format
+                        let status = statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
+                        if (isWindows) {
+                            // Windows service status mapping: Running -> active, Stopped -> inactive
+                            if (status === "Running") status = "active";
+                            else if (status === "Stopped") status = "inactive";
+                            else if (status === "NotFound") status = "inactive";
+                        }
+                        baseResult.services[displayName] = status;
 
                         const rawVersion = versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
                         if (rawVersion !== "Unknown" && !isNaN(parseFloat(rawVersion))) {
@@ -1271,8 +1399,11 @@ export class AWSStatusCheckService {
      * Get live agent status directly from instances via SSH
      * Checks all SSH usernames and operating systems
      * Returns real-time status and saves to DB
+     * @param keyId - AWS key ID
+     * @param windowsUsername - Optional Windows username (overrides default "Administrator")
+     * @param windowsPassword - Optional Windows password for authentication
      */
-    static async getLiveAgentStatus(keyId: string) {
+    static async getLiveAgentStatus(keyId: string, windowsUsername?: string, windowsPassword?: string) {
         try {
             console.log("🔄 Fetching live agent status for keyId:", keyId);
             const masterKey: any = CONFIG.masterKey;
@@ -1280,12 +1411,15 @@ export class AWSStatusCheckService {
                 throw new Error("Master key is not defined");
             }
 
-            const sshUsernames = ["awx", "centos", "ec2-user", "ubuntu"];
+            // Use provided Windows username or default to "Administrator"
+            const winUser = windowsUsername || "Administrator";
+            const sshUsernames = ["awx", "centos", "ec2-user", "ubuntu", winUser];
             const operatingSystems: any = {
                 "awx": ["rocky"],
                 "centos": ["centos"],
                 "ec2-user": ["amazon", "suse"],  // Changed to "amazon" to match both "Amazon_Linux" and "Amazon Linux"
                 "ubuntu": ["ubuntu"],
+                [winUser]: ["windows"],  // Windows Server support with dynamic username
             };
 
             let allResults: any[] = [];
@@ -1299,7 +1433,8 @@ export class AWSStatusCheckService {
                             keyId,
                             sshUsername,
                             masterKey,
-                            os
+                            os,
+                            windowsPassword  // Pass Windows password for Windows instances
                         );
 
                         if (data.success && data.results) {
