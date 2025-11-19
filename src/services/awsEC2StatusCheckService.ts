@@ -965,12 +965,14 @@ export class AWSStatusCheckService {
                         crowdStrike: "error",
                         qualys: "error",
                         cloudWatch: "error",
+                        alloy: "error",
                     },
                     versions: {
                         zabbixAgent: "N/A",
                         crowdStrike: "N/A",
                         qualys: "N/A",
-                        cloudWatch: "N/A"
+                        cloudWatch: "N/A",
+                        alloy: "N/A"
                     },
                     error: null
                 };
@@ -1012,6 +1014,11 @@ export class AWSStatusCheckService {
                             service: "amazon-cloudwatch-agent",
                             displayName: "cloudWatch",
                             versionCmd: `/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a status | grep -i version | awk -F'"' '{print $4}'`
+                        },
+                        {
+                            service: "alloy",
+                            displayName: "alloy",
+                            versionCmd: `alloy --version 2>&1 | head -n1 | awk '{print $3}'`
                         },
                     ];
 
@@ -1125,12 +1132,14 @@ export class AWSStatusCheckService {
                         crowdStrike: "error",
                         qualys: "error",
                         cloudWatch: "error",
+                        alloy: "error",
                     },
                     versions: {
                         zabbixAgent: "N/A",
                         crowdStrike: "N/A",
                         qualys: "N/A",
-                        cloudWatch: "N/A"
+                        cloudWatch: "N/A",
+                        alloy: "N/A"
                     },
                     error: null
                 };
@@ -1172,6 +1181,11 @@ export class AWSStatusCheckService {
                             service: "amazon-cloudwatch-agent",
                             displayName: "cloudWatch",
                             versionCmd: `/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a status | grep -i version | awk -F'"' '{print $4}'`
+                        },
+                        {
+                            service: "alloy",
+                            displayName: "alloy",
+                            versionCmd: `alloy --version 2>&1 | head -n1 | awk '{print $3}'`
                         },
                     ];
 
@@ -1241,6 +1255,124 @@ export class AWSStatusCheckService {
             return {
                 success: false,
                 message: (err as Error).message || "Failed to fetch agent status dashboard"
+            };
+        }
+    }
+
+    /**
+     * Get live agent status directly from instances via SSH
+     * Checks all SSH usernames and operating systems
+     * Returns real-time status and saves to DB
+     */
+    static async getLiveAgentStatus(keyId: string) {
+        try {
+            console.log("🔄 Fetching live agent status for keyId:", keyId);
+            const masterKey: any = CONFIG.masterKey;
+            if (!masterKey) {
+                throw new Error("Master key is not defined");
+            }
+
+            const sshUsernames = ["awx", "centos", "ec2-user", "ubuntu"];
+            const operatingSystems: any = {
+                "awx": ["rocky"],
+                "centos": ["centos"],
+                "ec2-user": ["amazon linux", "suse"],
+                "ubuntu": ["ubuntu"],
+            };
+
+            let allResults: any[] = [];
+
+            for (let sshUsername of sshUsernames) {
+                const osList = operatingSystems[sshUsername] || ["unknown"];
+                for (let os of osList) {
+                    try {
+                        console.log(`🔍 Checking status for ${sshUsername} (${os})`);
+                        const data: any = await this.getAllInstanceDetailsWithNginxStatus(
+                            keyId,
+                            sshUsername,
+                            masterKey,
+                            os
+                        );
+
+                        if (data.success && data.results) {
+                            allResults = allResults.concat(data.results);
+                        }
+                    } catch (err) {
+                        console.error(`❌ Error checking status for ${sshUsername} (${os}):`, err);
+                    }
+                }
+            }
+
+            // Remove duplicates based on instanceId, keeping the one with most data
+            const uniqueResults = Array.from(
+                allResults.reduce((map, item) => {
+                    const existing = map.get(item.instanceId);
+                    if (!existing || (item.services && Object.keys(item.services).length > Object.keys(existing.services || {}).length)) {
+                        map.set(item.instanceId, item);
+                    }
+                    return map;
+                }, new Map()).values()
+            );
+
+            console.log(`✅ Fetched live status for ${uniqueResults.length} unique instances`);
+
+            // Calculate stats
+            const stats = {
+                totalServers: uniqueResults.length,
+                zabbixAgent: { active: 0, inactive: 0, total: 0 },
+                crowdStrike: { active: 0, inactive: 0, total: 0 },
+                qualys: { active: 0, inactive: 0, total: 0 },
+                cloudWatch: { active: 0, inactive: 0, total: 0 },
+                alloy: { active: 0, inactive: 0, total: 0 },
+                byOS: {} as any,
+                byState: {} as any
+            };
+
+            uniqueResults.forEach((record: any) => {
+                // Count by agent status
+                if (record.services?.zabbixAgent === "active") stats.zabbixAgent.active++;
+                else stats.zabbixAgent.inactive++;
+                stats.zabbixAgent.total++;
+
+                if (record.services?.crowdStrike === "active") stats.crowdStrike.active++;
+                else stats.crowdStrike.inactive++;
+                stats.crowdStrike.total++;
+
+                if (record.services?.qualys === "active") stats.qualys.active++;
+                else stats.qualys.inactive++;
+                stats.qualys.total++;
+
+                if (record.services?.cloudWatch === "active") stats.cloudWatch.active++;
+                else stats.cloudWatch.inactive++;
+                stats.cloudWatch.total++;
+
+                if (record.services?.alloy === "active") stats.alloy.active++;
+                else stats.alloy.inactive++;
+                stats.alloy.total++;
+
+                // Count by OS
+                const os = record.os || "Unknown";
+                if (!stats.byOS[os]) stats.byOS[os] = 0;
+                stats.byOS[os]++;
+
+                // Count by state
+                const state = record.state || "Unknown";
+                if (!stats.byState[state]) stats.byState[state] = 0;
+                stats.byState[state]++;
+            });
+
+            return {
+                success: true,
+                data: {
+                    stats,
+                    records: uniqueResults
+                }
+            };
+        } catch (err) {
+            console.error("❌ Error fetching live agent status:", err);
+            return {
+                success: false,
+                message: (err as Error).message || "Failed to fetch live agent status"
             };
         }
     }

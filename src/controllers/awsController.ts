@@ -100,14 +100,30 @@ export class AwsController {
 
     /**
      * Get agent status dashboard with statistics
-     * No need for sshUsername, sshKeyPath, operatingSystem - fetches from DB
+     * If no date range: fetches live status from instances via SSH
+     * If date range provided: fetches historical data from DB
      * Supports optional date range filtering via query params: startDate, endDate
      */
     static async getAgentStatusDashboard(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
             const keyId = req.params.keyId;
-            const { startDate, endDate } = req.query;
+            const { startDate, endDate, live } = req.query;
 
+            // If no date range or live=true, fetch live status from instances
+            if ((!startDate && !endDate) || live === 'true') {
+                const liveData = await AWSStatusCheckService.getLiveAgentStatus(keyId);
+
+                if (!liveData.success) {
+                    return res.status(500).json({
+                        success: false,
+                        message: liveData.message || "Failed to fetch live agent status"
+                    });
+                }
+
+                return res.status(200).json(liveData);
+            }
+
+            // Otherwise, fetch from database with date range
             const data = await AWSStatusCheckService.getAgentStatusDashboard(
                 keyId,
                 startDate ? String(startDate) : undefined,

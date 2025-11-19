@@ -100,6 +100,11 @@ export class StatusRecordDao {
                 inactive: 0,
                 total: 0
             },
+            alloy: {
+                active: 0,
+                inactive: 0,
+                total: 0
+            },
             byOS: {} as any,
             byState: {} as any
         };
@@ -121,6 +126,10 @@ export class StatusRecordDao {
             if (record.services?.cloudWatch === "active") stats.cloudWatch.active++;
             else stats.cloudWatch.inactive++;
             stats.cloudWatch.total++;
+
+            if (record.services?.alloy === "active") stats.alloy.active++;
+            else stats.alloy.inactive++;
+            stats.alloy.total++;
 
             // Count by OS
             const os = record.os || "Unknown";

@@ -17,6 +17,7 @@ export default class AwsKeysRouter {
     public routes(): void {
         // GET
         this.router.get('/getAllAWSKey', authMiddleware(), AwsKeyController.getAllAWSKey);
+        this.router.get('/getAWSKeyById/:id', authMiddleware(), AwsKeyController.getAWSKeyById);
         this.router.get("/getAWSRegions", authMiddleware(), AwsKeyController.getAWSRegions)
         
         // POST

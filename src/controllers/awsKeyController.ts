@@ -33,6 +33,19 @@ export class AwsKeyController {
         }
     }
 
+    static async getAWSKeyById(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const id = req.params.id;
+            const awsKey = await AWSKeyService.getAWSKeyById(id);
+            if (!awsKey) {
+                return res.status(404).send("AWS Key not found.");
+            }
+            res.status(200).send(awsKey);
+        } catch (err) {
+            next(err);
+        }
+    }
+
     static async updateApiKey(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
             const user = req.user; 
