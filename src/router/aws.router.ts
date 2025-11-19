@@ -32,8 +32,8 @@ export default class AwsRouter {
         this.router.get("/getAllEKSEC2InstancesFromAllRegions", authMiddleware(), AwsController.getAllEKSEC2InstancesFromAllRegions)
         this.router.get("/exportAllEKSInstancesToExcel", authMiddleware(), AwsController.exportAllEKSInstancesToExcel)
 
-        // Agent Status Dashboard (NEW - auto-fetch from DB, no inputs needed)
-        this.router.get("/getAgentStatusDashboard/:keyId", authMiddleware(), AwsController.getAgentStatusDashboard)
+        // Agent Status Dashboard (NEW - auto-fetch from DB, supports Windows credentials in body)
+        this.router.post("/getAgentStatusDashboard/:keyId", authMiddleware(), AwsController.getAgentStatusDashboard)
 
         // Check the zabbix-status (OLD - requires sshUsername, sshKeyPath, operatingSystem)
         this.router.get("/getZabbixStatus/:keyId", authMiddleware(), AwsController.getZabbixStatus)
