@@ -1,5 +1,6 @@
 import { AWSKeyDao } from "../lib/dao/awsKey.dao"
 import { throwError } from "../util/util";
+import { encryptAWSCredentials } from "../util/crypto.util";
 
 
 export class AWSKeyService {
@@ -14,16 +15,21 @@ export class AWSKeyService {
     static async getAWSKeyById(keyId: any) {
         const keyData: any = await AWSKeyDao.getAWSKeyById(keyId);
         if (!keyData) {
-            throwError("no key found", 404); 
+            throwError("no key found", 404);
         }
 
-        const awsConfig: any = {
+        // Encrypt AWS credentials before sending to client
+        const encryptedCredentials = encryptAWSCredentials({
+            accessKeyId: keyData.accessKeyId,
+            secretAccessKey: keyData.secretAccessKey,
             region: keyData.region,
-            credentials: {
-                accessKeyId: keyData.accessKeyId, // Replace with your access key id
-                secretAccessKey: keyData.secretAccessKey // Replace with your secret access key
-            },
-            enviroment: keyData.enviroment
+            environment: keyData.enviroment
+        });
+
+        const awsConfig: any = {
+            encrypted_credentials: encryptedCredentials,
+            region: keyData.region,
+            environment: keyData.enviroment
         };
         return awsConfig;
     } 
