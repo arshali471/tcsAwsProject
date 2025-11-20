@@ -902,6 +902,77 @@ export class AWSStatusCheckService {
     //     }
     // }
 
+    /**
+     * Execute PowerShell commands on Windows instance via AWS Systems Manager (SSM)
+     * @param ssmClient - SSM client instance
+     * @param instanceId - EC2 instance ID
+     * @param commands - Array of PowerShell commands to execute
+     * @returns Command output or error
+     */
+    static async executeSSMCommand(ssmClient: SSMClient, instanceId: string, commands: string[]): Promise<{ success: boolean; output: string; error?: string }> {
+        try {
+            // Send command via SSM
+            const sendCommandResponse = await ssmClient.send(new SendCommandCommand({
+                InstanceIds: [instanceId],
+                DocumentName: "AWS-RunPowerShellScript",
+                Parameters: {
+                    commands: commands
+                },
+                TimeoutSeconds: 30  // 30 second timeout for command execution
+            }));
+
+            const commandId = sendCommandResponse.Command?.CommandId;
+            if (!commandId) {
+                return { success: false, output: '', error: 'Failed to get command ID from SSM' };
+            }
+
+            // Wait for command to complete and get output
+            let attempts = 0;
+            const maxAttempts = 15;  // 15 attempts * 2 seconds = 30 seconds max wait
+
+            while (attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 2000));  // Wait 2 seconds between checks
+
+                try {
+                    const invocationResponse = await ssmClient.send(new GetCommandInvocationCommand({
+                        CommandId: commandId,
+                        InstanceId: instanceId
+                    }));
+
+                    const status = invocationResponse.Status;
+
+                    if (status === "Success") {
+                        return {
+                            success: true,
+                            output: invocationResponse.StandardOutputContent || ''
+                        };
+                    } else if (status === "Failed" || status === "Cancelled" || status === "TimedOut") {
+                        return {
+                            success: false,
+                            output: invocationResponse.StandardOutputContent || '',
+                            error: invocationResponse.StandardErrorContent || `Command ${status}`
+                        };
+                    }
+                    // If InProgress or Pending, continue waiting
+                } catch (invocationErr: any) {
+                    if (invocationErr.name === "InvocationDoesNotExist") {
+                        // Command not ready yet, continue waiting
+                        attempts++;
+                        continue;
+                    }
+                    throw invocationErr;
+                }
+
+                attempts++;
+            }
+
+            return { success: false, output: '', error: 'SSM command timed out waiting for response' };
+        } catch (err: any) {
+            console.error(`SSM command execution error: ${err.message}`);
+            return { success: false, output: '', error: err.message };
+        }
+    }
+
     static async getAllInstanceDetailsWithNginxStatus(
         keyId: any,
         sshUsername: string,
@@ -912,6 +983,7 @@ export class AWSStatusCheckService {
         try {
             const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
             const ec2Client = new EC2Client(awsConfig);
+            const ssmClient = new SSMClient(awsConfig);  // Add SSM client for Windows instances
             const data: any = await ec2Client.send(new DescribeInstancesCommand({}));
             const instances = data.Reservations.flatMap((res: any) => res.Instances);
 
@@ -990,65 +1062,129 @@ export class AWSStatusCheckService {
                     // Detect if it's a Windows or Linux instance
                     const isWindows = instance.Platform === "windows" || osTag.toLowerCase().includes("windows");
 
-                    // Add timeout to SSH connection to fail fast if unreachable
-                    const sshConfig: any = {
-                        host: privateIp,
-                        username: sshUsername,
-                        readyTimeout: 10000,  // 10 seconds timeout for connection ready
-                        timeout: 15000,       // 15 seconds overall timeout
-                    };
-
-                    // Use password for Windows, private key for Linux
-                    if (isWindows && windowsPassword) {
-                        sshConfig.password = windowsPassword;
-                        console.log(`🔐 Connecting to Windows instance ${privateIp} with password authentication`);
-                    } else {
-                        sshConfig.privateKey = privateKey;
-                    }
-
-                    await ssh.connect(sshConfig);
-
-                    console.log(`✅ SSH connected to ${privateIp} (${instanceId})`);
-
-                    let servicesToCheck: any[] = [];
-
                     if (isWindows) {
-                        // Windows-specific service checks using PowerShell
-                        servicesToCheck = [
-                            {
-                                service: "Zabbix Agent 2",
-                                displayName: "zabbixAgent",
-                                statusCmd: `powershell -Command "try { $s = Get-Service 'Zabbix Agent 2' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
-                                versionCmd: `powershell -Command "try { $path = 'C:\\Program Files\\Zabbix Agent 2\\zabbix_agent2.exe'; if (Test-Path $path) { & $path --version 2>$null | Select-Object -First 1 | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } } } else { 'N/A' } } catch { 'N/A' }"`
-                            },
-                            {
-                                service: "CSFalconService",
-                                displayName: "crowdStrike",
-                                statusCmd: `powershell -Command "try { $s = Get-Service 'CSFalconService' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
-                                versionCmd: `powershell -Command "try { $path = 'C:\\Program Files\\CrowdStrike\\CSFalconService.exe'; if (Test-Path $path) { (Get-ItemProperty $path).VersionInfo.FileVersion } else { 'N/A' } } catch { 'N/A' }"`
-                            },
-                            {
-                                service: "QualysAgent",
-                                displayName: "qualys",
-                                statusCmd: `powershell -Command "try { $s = Get-Service 'QualysAgent' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
-                                versionCmd: `powershell -Command "try { $path = 'C:\\Program Files\\Qualys\\QualysAgent\\QualysAgent.exe'; if (Test-Path $path) { (Get-ItemProperty $path).VersionInfo.FileVersion } else { 'N/A' } } catch { 'N/A' }"`
-                            },
-                            {
-                                service: "AmazonCloudWatchAgent",
-                                displayName: "cloudWatch",
-                                statusCmd: `powershell -Command "try { $s = Get-Service 'AmazonCloudWatchAgent' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
-                                versionCmd: `powershell -Command "try { & 'C:\\Program Files\\Amazon\\AmazonCloudWatchAgent\\amazon-cloudwatch-agent-ctl.ps1' -m ec2 -a query 2>$null | Select-String -Pattern 'version' | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } } } catch { 'N/A' }"`
-                            },
-                            {
-                                service: "Alloy",
-                                displayName: "alloy",
-                                statusCmd: `powershell -Command "try { $s = Get-Service 'Alloy' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
-                                versionCmd: `powershell -Command "try { $paths = @('C:\\Program Files\\GrafanaLabs\\Alloy\\alloy.exe', 'C:\\Program Files\\Alloy\\alloy.exe'); foreach ($path in $paths) { if (Test-Path $path) { & $path --version 2>$null | Select-Object -First 1 | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } }; break } } if (-not $found) { 'N/A' } } catch { 'N/A' }"`
-                            },
-                        ];
+                        // Use AWS Systems Manager (SSM) for Windows instances
+                        console.log(`🔄 Using SSM for Windows instance ${instanceId} (${privateIp})`);
+
+                        // Build PowerShell script to check all services status and versions
+                        const powerShellScript = `
+# Check service status and versions
+$services = @{
+    'Zabbix Agent 2' = @{
+        Path = 'C:\\Program Files\\Zabbix Agent 2\\zabbix_agent2.exe'
+        VersionCmd = { param($path) & $path --version 2>$null | Select-Object -First 1 | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } } }
+    }
+    'CSFalconService' = @{
+        Path = 'C:\\Program Files\\CrowdStrike\\CSFalconService.exe'
+        VersionCmd = { param($path) (Get-ItemProperty $path).VersionInfo.FileVersion }
+    }
+    'QualysAgent' = @{
+        Path = 'C:\\Program Files\\Qualys\\QualysAgent\\QualysAgent.exe'
+        VersionCmd = { param($path) (Get-ItemProperty $path).VersionInfo.FileVersion }
+    }
+    'AmazonCloudWatchAgent' = @{
+        Path = 'C:\\Program Files\\Amazon\\AmazonCloudWatchAgent\\amazon-cloudwatch-agent-ctl.ps1'
+        VersionCmd = { param($path) & $path -m ec2 -a query 2>$null | Select-String -Pattern 'version' | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } } }
+    }
+    'Alloy' = @{
+        Path = @('C:\\Program Files\\GrafanaLabs\\Alloy\\alloy.exe', 'C:\\Program Files\\Alloy\\alloy.exe')
+        VersionCmd = { param($paths) foreach ($p in $paths) { if (Test-Path $p) { & $p --version 2>$null | Select-Object -First 1 | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] }; return }; break } }; 'N/A' }
+    }
+}
+
+$result = @{}
+
+foreach ($svcName in $services.Keys) {
+    try {
+        $svc = Get-Service $svcName -ErrorAction Stop
+        $status = $svc.Status.ToString()
+
+        # Get version
+        $version = 'N/A'
+        try {
+            $svcInfo = $services[$svcName]
+            if ($svcInfo.Path -is [Array]) {
+                $version = & $svcInfo.VersionCmd $svcInfo.Path
+            } else {
+                if (Test-Path $svcInfo.Path) {
+                    $version = & $svcInfo.VersionCmd $svcInfo.Path
+                }
+            }
+            if ([string]::IsNullOrWhiteSpace($version)) { $version = 'N/A' }
+        } catch {
+            $version = 'N/A'
+        }
+
+        $result[$svcName] = @{
+            Status = $status
+            Version = $version
+        }
+    } catch {
+        $result[$svcName] = @{
+            Status = 'NotFound'
+            Version = 'N/A'
+        }
+    }
+}
+
+$result | ConvertTo-Json -Compress
+`;
+
+                        const ssmResult = await this.executeSSMCommand(ssmClient, instanceId, [powerShellScript]);
+
+                        if (ssmResult.success) {
+                            try {
+                                const servicesData = JSON.parse(ssmResult.output);
+
+                                // Map service names to baseResult keys
+                                const serviceMapping: any = {
+                                    'Zabbix Agent 2': 'zabbixAgent',
+                                    'CSFalconService': 'crowdStrike',
+                                    'QualysAgent': 'qualys',
+                                    'AmazonCloudWatchAgent': 'cloudWatch',
+                                    'Alloy': 'alloy'
+                                };
+
+                                // Update baseResult with service status and versions
+                                for (const [svcName, displayKey] of Object.entries(serviceMapping)) {
+                                    const svcData = servicesData[svcName];
+                                    if (svcData) {
+                                        // Map Windows service status to standard format
+                                        const status = svcData.Status === 'Running' ? 'active' :
+                                                     svcData.Status === 'Stopped' ? 'inactive' :
+                                                     svcData.Status === 'NotFound' ? 'not-found' : 'error';
+                                        baseResult.services[displayKey as string] = status;
+                                        baseResult.versions[displayKey as string] = svcData.Version || 'N/A';
+                                    }
+                                }
+
+                                console.log(`✅ SSM check completed for Windows instance ${instanceId}`);
+                            } catch (parseErr: any) {
+                                console.error(`❌ Failed to parse SSM output for ${instanceId}:`, parseErr.message);
+                                baseResult.error = `Failed to parse SSM output: ${parseErr.message}`;
+                            }
+                        } else {
+                            console.error(`❌ SSM command failed for ${instanceId}:`, ssmResult.error);
+                            baseResult.error = ssmResult.error || 'SSM command failed';
+                        }
+
                     } else {
+                        // Use SSH for Linux instances
+                        console.log(`🔐 Using SSH for Linux instance ${instanceId} (${privateIp})`);
+
+                        const sshConfig: any = {
+                            host: privateIp,
+                            username: sshUsername,
+                            privateKey: privateKey,
+                            readyTimeout: 8000,
+                            timeout: 10000,
+                        };
+
+                        await ssh.connect(sshConfig);
+                        console.log(`✅ SSH connected to ${privateIp} (${instanceId})`);
+
                         // Linux-specific service checks
-                        servicesToCheck = [
+                        const servicesToCheck = [
                             {
                                 service: "zabbix-agent2",
                                 displayName: "zabbixAgent",
@@ -1080,27 +1216,21 @@ export class AWSStatusCheckService {
                                 versionCmd: `(alloy --version 2>/dev/null || /usr/bin/alloy --version 2>/dev/null || /usr/local/bin/alloy --version 2>/dev/null) | head -n1 | grep -oP 'v?\\d+\\.\\d+\\.\\d+' | head -n1 | sed 's/^v//' || echo "N/A"`
                             },
                         ];
-                    }
 
-                    for (const { service, displayName, statusCmd, versionCmd } of servicesToCheck) {
-                        const statusResult = await ssh.execCommand(statusCmd || `systemctl is-active ${service}`);
-                        const versionResult = await ssh.execCommand(versionCmd);
+                        for (const { service, displayName, statusCmd, versionCmd } of servicesToCheck) {
+                            const statusResult = await ssh.execCommand(statusCmd || `systemctl is-active ${service}`);
+                            const versionResult = await ssh.execCommand(versionCmd);
 
-                        // Map Windows service status to standard format
-                        let status = statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
-                        if (isWindows) {
-                            // Windows service status mapping: Running -> active, Stopped -> inactive
-                            if (status === "Running") status = "active";
-                            else if (status === "Stopped") status = "inactive";
-                            else if (status === "NotFound") status = "inactive";
-                        }
-                        baseResult.services[displayName] = status;
+                            // Map Linux service status to standard format
+                            let status = statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
+                            baseResult.services[displayName] = status;
 
-                        const rawVersion = versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
-                        if (rawVersion !== "Unknown" && !isNaN(parseFloat(rawVersion))) {
-                            baseResult.versions[displayName] = parseFloat(rawVersion).toFixed(2);
-                        } else {
-                            baseResult.versions[displayName] = rawVersion !== "Unknown" ? rawVersion : "Unknown";
+                            const rawVersion = versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
+                            if (rawVersion !== "Unknown" && !isNaN(parseFloat(rawVersion))) {
+                                baseResult.versions[displayName] = parseFloat(rawVersion).toFixed(2);
+                            } else {
+                                baseResult.versions[displayName] = rawVersion !== "Unknown" ? rawVersion : "Unknown";
+                            }
                         }
                     }
 
@@ -1147,6 +1277,7 @@ export class AWSStatusCheckService {
         try {
             const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
             const ec2Client = new EC2Client(awsConfig);
+            const ssmClient = new SSMClient(awsConfig);  // Add SSM client for Windows instances
             const data: any = await ec2Client.send(new DescribeInstancesCommand({}));
             const instances = data.Reservations.flatMap((res: any) => res.Instances);
 
@@ -1225,65 +1356,129 @@ export class AWSStatusCheckService {
                     // Detect if it's a Windows or Linux instance
                     const isWindows = instance.Platform === "windows" || osTag.toLowerCase().includes("windows");
 
-                    // Add timeout to SSH connection to fail fast if unreachable
-                    const sshConfig: any = {
-                        host: privateIp,
-                        username: sshUsername,
-                        readyTimeout: 10000,  // 10 seconds timeout for connection ready
-                        timeout: 15000,       // 15 seconds overall timeout
-                    };
-
-                    // Use password for Windows, private key for Linux
-                    if (isWindows && windowsPassword) {
-                        sshConfig.password = windowsPassword;
-                        console.log(`🔐 Connecting to Windows instance ${privateIp} with password authentication`);
-                    } else {
-                        sshConfig.privateKey = privateKey;
-                    }
-
-                    await ssh.connect(sshConfig);
-
-                    console.log(`✅ SSH connected to ${privateIp} (${instanceId})`);
-
-                    let servicesToCheck: any[] = [];
-
                     if (isWindows) {
-                        // Windows-specific service checks using PowerShell
-                        servicesToCheck = [
-                            {
-                                service: "Zabbix Agent 2",
-                                displayName: "zabbixAgent",
-                                statusCmd: `powershell -Command "try { $s = Get-Service 'Zabbix Agent 2' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
-                                versionCmd: `powershell -Command "try { $path = 'C:\\Program Files\\Zabbix Agent 2\\zabbix_agent2.exe'; if (Test-Path $path) { & $path --version 2>$null | Select-Object -First 1 | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } } } else { 'N/A' } } catch { 'N/A' }"`
-                            },
-                            {
-                                service: "CSFalconService",
-                                displayName: "crowdStrike",
-                                statusCmd: `powershell -Command "try { $s = Get-Service 'CSFalconService' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
-                                versionCmd: `powershell -Command "try { $path = 'C:\\Program Files\\CrowdStrike\\CSFalconService.exe'; if (Test-Path $path) { (Get-ItemProperty $path).VersionInfo.FileVersion } else { 'N/A' } } catch { 'N/A' }"`
-                            },
-                            {
-                                service: "QualysAgent",
-                                displayName: "qualys",
-                                statusCmd: `powershell -Command "try { $s = Get-Service 'QualysAgent' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
-                                versionCmd: `powershell -Command "try { $path = 'C:\\Program Files\\Qualys\\QualysAgent\\QualysAgent.exe'; if (Test-Path $path) { (Get-ItemProperty $path).VersionInfo.FileVersion } else { 'N/A' } } catch { 'N/A' }"`
-                            },
-                            {
-                                service: "AmazonCloudWatchAgent",
-                                displayName: "cloudWatch",
-                                statusCmd: `powershell -Command "try { $s = Get-Service 'AmazonCloudWatchAgent' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
-                                versionCmd: `powershell -Command "try { & 'C:\\Program Files\\Amazon\\AmazonCloudWatchAgent\\amazon-cloudwatch-agent-ctl.ps1' -m ec2 -a query 2>$null | Select-String -Pattern 'version' | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } } } catch { 'N/A' }"`
-                            },
-                            {
-                                service: "Alloy",
-                                displayName: "alloy",
-                                statusCmd: `powershell -Command "try { $s = Get-Service 'Alloy' -ErrorAction Stop; $s.Status } catch { 'NotFound' }"`,
-                                versionCmd: `powershell -Command "try { $paths = @('C:\\Program Files\\GrafanaLabs\\Alloy\\alloy.exe', 'C:\\Program Files\\Alloy\\alloy.exe'); foreach ($path in $paths) { if (Test-Path $path) { & $path --version 2>$null | Select-Object -First 1 | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } }; break } } if (-not $found) { 'N/A' } } catch { 'N/A' }"`
-                            },
-                        ];
+                        // Use AWS Systems Manager (SSM) for Windows instances
+                        console.log(`🔄 Using SSM for Windows instance ${instanceId} (${privateIp})`);
+
+                        // Build PowerShell script to check all services status and versions
+                        const powerShellScript = `
+# Check service status and versions
+$services = @{
+    'Zabbix Agent 2' = @{
+        Path = 'C:\\Program Files\\Zabbix Agent 2\\zabbix_agent2.exe'
+        VersionCmd = { param($path) & $path --version 2>$null | Select-Object -First 1 | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } } }
+    }
+    'CSFalconService' = @{
+        Path = 'C:\\Program Files\\CrowdStrike\\CSFalconService.exe'
+        VersionCmd = { param($path) (Get-ItemProperty $path).VersionInfo.FileVersion }
+    }
+    'QualysAgent' = @{
+        Path = 'C:\\Program Files\\Qualys\\QualysAgent\\QualysAgent.exe'
+        VersionCmd = { param($path) (Get-ItemProperty $path).VersionInfo.FileVersion }
+    }
+    'AmazonCloudWatchAgent' = @{
+        Path = 'C:\\Program Files\\Amazon\\AmazonCloudWatchAgent\\amazon-cloudwatch-agent-ctl.ps1'
+        VersionCmd = { param($path) & $path -m ec2 -a query 2>$null | Select-String -Pattern 'version' | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] } else { 'N/A' } } }
+    }
+    'Alloy' = @{
+        Path = @('C:\\Program Files\\GrafanaLabs\\Alloy\\alloy.exe', 'C:\\Program Files\\Alloy\\alloy.exe')
+        VersionCmd = { param($paths) foreach ($p in $paths) { if (Test-Path $p) { & $p --version 2>$null | Select-Object -First 1 | ForEach-Object { if ($_ -match '([0-9]+\\.[0-9]+\\.[0-9]+)') { $matches[1] }; return }; break } }; 'N/A' }
+    }
+}
+
+$result = @{}
+
+foreach ($svcName in $services.Keys) {
+    try {
+        $svc = Get-Service $svcName -ErrorAction Stop
+        $status = $svc.Status.ToString()
+
+        # Get version
+        $version = 'N/A'
+        try {
+            $svcInfo = $services[$svcName]
+            if ($svcInfo.Path -is [Array]) {
+                $version = & $svcInfo.VersionCmd $svcInfo.Path
+            } else {
+                if (Test-Path $svcInfo.Path) {
+                    $version = & $svcInfo.VersionCmd $svcInfo.Path
+                }
+            }
+            if ([string]::IsNullOrWhiteSpace($version)) { $version = 'N/A' }
+        } catch {
+            $version = 'N/A'
+        }
+
+        $result[$svcName] = @{
+            Status = $status
+            Version = $version
+        }
+    } catch {
+        $result[$svcName] = @{
+            Status = 'NotFound'
+            Version = 'N/A'
+        }
+    }
+}
+
+$result | ConvertTo-Json -Compress
+`;
+
+                        const ssmResult = await this.executeSSMCommand(ssmClient, instanceId, [powerShellScript]);
+
+                        if (ssmResult.success) {
+                            try {
+                                const servicesData = JSON.parse(ssmResult.output);
+
+                                // Map service names to baseResult keys
+                                const serviceMapping: any = {
+                                    'Zabbix Agent 2': 'zabbixAgent',
+                                    'CSFalconService': 'crowdStrike',
+                                    'QualysAgent': 'qualys',
+                                    'AmazonCloudWatchAgent': 'cloudWatch',
+                                    'Alloy': 'alloy'
+                                };
+
+                                // Update baseResult with service status and versions
+                                for (const [svcName, displayKey] of Object.entries(serviceMapping)) {
+                                    const svcData = servicesData[svcName];
+                                    if (svcData) {
+                                        // Map Windows service status to standard format
+                                        const status = svcData.Status === 'Running' ? 'active' :
+                                                     svcData.Status === 'Stopped' ? 'inactive' :
+                                                     svcData.Status === 'NotFound' ? 'not-found' : 'error';
+                                        baseResult.services[displayKey as string] = status;
+                                        baseResult.versions[displayKey as string] = svcData.Version || 'N/A';
+                                    }
+                                }
+
+                                console.log(`✅ SSM check completed for Windows instance ${instanceId}`);
+                            } catch (parseErr: any) {
+                                console.error(`❌ Failed to parse SSM output for ${instanceId}:`, parseErr.message);
+                                baseResult.error = `Failed to parse SSM output: ${parseErr.message}`;
+                            }
+                        } else {
+                            console.error(`❌ SSM command failed for ${instanceId}:`, ssmResult.error);
+                            baseResult.error = ssmResult.error || 'SSM command failed';
+                        }
+
                     } else {
+                        // Use SSH for Linux instances
+                        console.log(`🔐 Using SSH for Linux instance ${instanceId} (${privateIp})`);
+
+                        const sshConfig: any = {
+                            host: privateIp,
+                            username: sshUsername,
+                            privateKey: privateKey,
+                            readyTimeout: 8000,
+                            timeout: 10000,
+                        };
+
+                        await ssh.connect(sshConfig);
+                        console.log(`✅ SSH connected to ${privateIp} (${instanceId})`);
+
                         // Linux-specific service checks
-                        servicesToCheck = [
+                        const servicesToCheck = [
                             {
                                 service: "zabbix-agent2",
                                 displayName: "zabbixAgent",
@@ -1315,27 +1510,21 @@ export class AWSStatusCheckService {
                                 versionCmd: `(alloy --version 2>/dev/null || /usr/bin/alloy --version 2>/dev/null || /usr/local/bin/alloy --version 2>/dev/null) | head -n1 | grep -oP 'v?\\d+\\.\\d+\\.\\d+' | head -n1 | sed 's/^v//' || echo "N/A"`
                             },
                         ];
-                    }
 
-                    for (const { service, displayName, statusCmd, versionCmd } of servicesToCheck) {
-                        const statusResult = await ssh.execCommand(statusCmd || `systemctl is-active ${service}`);
-                        const versionResult = await ssh.execCommand(versionCmd);
+                        for (const { service, displayName, statusCmd, versionCmd } of servicesToCheck) {
+                            const statusResult = await ssh.execCommand(statusCmd || `systemctl is-active ${service}`);
+                            const versionResult = await ssh.execCommand(versionCmd);
 
-                        // Map Windows service status to standard format
-                        let status = statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
-                        if (isWindows) {
-                            // Windows service status mapping: Running -> active, Stopped -> inactive
-                            if (status === "Running") status = "active";
-                            else if (status === "Stopped") status = "inactive";
-                            else if (status === "NotFound") status = "inactive";
-                        }
-                        baseResult.services[displayName] = status;
+                            // Map Linux service status to standard format
+                            let status = statusResult.stdout.trim() || statusResult.stderr.trim() || "Unknown";
+                            baseResult.services[displayName] = status;
 
-                        const rawVersion = versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
-                        if (rawVersion !== "Unknown" && !isNaN(parseFloat(rawVersion))) {
-                            baseResult.versions[displayName] = parseFloat(rawVersion).toFixed(2);
-                        } else {
-                            baseResult.versions[displayName] = rawVersion !== "Unknown" ? rawVersion : "Unknown";
+                            const rawVersion = versionResult.stdout.trim() || versionResult.stderr.trim() || "Unknown";
+                            if (rawVersion !== "Unknown" && !isNaN(parseFloat(rawVersion))) {
+                                baseResult.versions[displayName] = parseFloat(rawVersion).toFixed(2);
+                            } else {
+                                baseResult.versions[displayName] = rawVersion !== "Unknown" ? rawVersion : "Unknown";
+                            }
                         }
                     }
 
@@ -1401,7 +1590,7 @@ export class AWSStatusCheckService {
      * Returns real-time status and saves to DB
      * @param keyId - AWS key ID
      * @param windowsUsername - Optional Windows username (overrides default "Administrator")
-     * @param windowsPassword - Optional Windows password for authentication
+     * @param windowsPassword - Optional Windows password for authentication. If not provided, Windows servers will be skipped.
      */
     static async getLiveAgentStatus(keyId: string, windowsUsername?: string, windowsPassword?: string) {
         try {
@@ -1411,16 +1600,34 @@ export class AWSStatusCheckService {
                 throw new Error("Master key is not defined");
             }
 
-            // Use provided Windows username or default to "Administrator"
-            const winUser = windowsUsername || "Administrator";
-            const sshUsernames = ["awx", "centos", "ec2-user", "ubuntu", winUser];
-            const operatingSystems: any = {
-                "awx": ["rocky"],
-                "centos": ["centos"],
-                "ec2-user": ["amazon", "suse"],  // Changed to "amazon" to match both "Amazon_Linux" and "Amazon Linux"
-                "ubuntu": ["ubuntu"],
-                [winUser]: ["windows"],  // Windows Server support with dynamic username
-            };
+            // Build SSH usernames list - only include Windows if password is provided
+            const linuxUsernames = ["awx", "centos", "ec2-user", "ubuntu"];
+            let sshUsernames: string[];
+            let operatingSystems: any;
+
+            if (windowsPassword) {
+                // Include Windows servers when password is provided
+                const winUser = windowsUsername || "Administrator";
+                sshUsernames = [...linuxUsernames, winUser];
+                operatingSystems = {
+                    "awx": ["rocky"],
+                    "centos": ["centos"],
+                    "ec2-user": ["amazon", "suse"],
+                    "ubuntu": ["ubuntu"],
+                    [winUser]: ["windows"],  // Windows Server support with dynamic username
+                };
+                console.log("✅ Windows credentials provided - checking both Linux and Windows servers");
+            } else {
+                // Skip Windows servers when no password is provided
+                sshUsernames = linuxUsernames;
+                operatingSystems = {
+                    "awx": ["rocky"],
+                    "centos": ["centos"],
+                    "ec2-user": ["amazon", "suse"],
+                    "ubuntu": ["ubuntu"],
+                };
+                console.log("ℹ️ No Windows credentials provided - checking Linux servers only");
+            }
 
             let allResults: any[] = [];
 
