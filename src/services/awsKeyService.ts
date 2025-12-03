@@ -18,18 +18,14 @@ export class AWSKeyService {
             throwError("no key found", 404);
         }
 
-        // Encrypt AWS credentials before sending to client
-        const encryptedCredentials = encryptAWSCredentials({
-            accessKeyId: keyData.accessKeyId,
-            secretAccessKey: keyData.secretAccessKey,
-            region: keyData.region,
-            environment: keyData.enviroment
-        });
-
+        // Return AWS config in format expected by AWS SDK clients
         const awsConfig: any = {
-            encrypted_credentials: encryptedCredentials,
             region: keyData.region,
-            environment: keyData.enviroment
+            credentials: {
+                accessKeyId: keyData.accessKeyId,
+                secretAccessKey: keyData.secretAccessKey
+            },
+            enviroment: keyData.enviroment
         };
         return awsConfig;
     } 

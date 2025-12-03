@@ -21,7 +21,52 @@ export class AwsCostController {
             });
         } catch (err: any) {
             console.error("Error fetching cost dashboard:", err);
-            next(err);
+
+            // Extract detailed error information
+            const errorDetails = {
+                success: false,
+                message: err.message || "Failed to fetch cost dashboard data",
+                errorType: err.name || "Unknown Error",
+                details: null as any
+            };
+
+            // Handle AWS IAM permission errors
+            if (err.message && err.message.includes("is not authorized to perform")) {
+                errorDetails.errorType = "IAM Permission Error";
+                errorDetails.message = "IAM user lacks required permissions for AWS Cost Explorer";
+                errorDetails.details = {
+                    error: err.message,
+                    requiredPermissions: [
+                        "ce:GetCostAndUsage",
+                        "ce:GetCostForecast"
+                    ],
+                    solution: "Please add the following IAM policy to the user/role:\n" +
+                             "{\n" +
+                             '  "Version": "2012-10-17",\n' +
+                             '  "Statement": [\n' +
+                             '    {\n' +
+                             '      "Effect": "Allow",\n' +
+                             '      "Action": [\n' +
+                             '        "ce:GetCostAndUsage",\n' +
+                             '        "ce:GetCostForecast",\n' +
+                             '        "ce:GetDimensionValues"\n' +
+                             '      ],\n' +
+                             '      "Resource": "*"\n' +
+                             '    }\n' +
+                             '  ]\n' +
+                             '}',
+                    awsDocumentation: "https://docs.aws.amazon.com/cost-management/latest/userguide/billing-permissions-ref.html"
+                };
+            } else if (err.code === "AccessDeniedException") {
+                errorDetails.errorType = "Access Denied";
+                errorDetails.message = "Access denied to AWS Cost Explorer";
+                errorDetails.details = {
+                    error: err.message,
+                    hint: "Verify IAM permissions for Cost Explorer access"
+                };
+            }
+
+            return res.status(403).json(errorDetails);
         }
     }
 
@@ -55,7 +100,14 @@ export class AwsCostController {
             });
         } catch (err: any) {
             console.error("Error fetching cost by service:", err);
-            next(err);
+            return res.status(403).json({
+                success: false,
+                message: err.message || "Failed to fetch cost by service",
+                errorType: err.name || "Unknown Error",
+                details: err.message && err.message.includes("is not authorized")
+                    ? { error: err.message, hint: "IAM permissions required for ce:GetCostAndUsage" }
+                    : null
+            });
         }
     }
 
@@ -178,7 +230,14 @@ export class AwsCostController {
             });
         } catch (err: any) {
             console.error("Error comparing costs:", err);
-            next(err);
+            return res.status(403).json({
+                success: false,
+                message: err.message || "Failed to compare costs",
+                errorType: err.name || "Unknown Error",
+                details: err.message && err.message.includes("is not authorized")
+                    ? { error: err.message, hint: "IAM permissions required for ce:GetCostAndUsage" }
+                    : null
+            });
         }
     }
 
@@ -209,7 +268,14 @@ export class AwsCostController {
             });
         } catch (err: any) {
             console.error("Error fetching top services:", err);
-            next(err);
+            return res.status(403).json({
+                success: false,
+                message: err.message || "Failed to fetch top services",
+                errorType: err.name || "Unknown Error",
+                details: err.message && err.message.includes("is not authorized")
+                    ? { error: err.message, hint: "IAM permissions required for ce:GetCostAndUsage" }
+                    : null
+            });
         }
     }
 }
