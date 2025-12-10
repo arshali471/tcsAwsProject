@@ -47,12 +47,17 @@ export class StatusRecordDao {
             const end = new Date(sanitizeDate(endDate));
 
             if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                console.log(`📅 Date range query: ${start.toISOString()} to ${end.toISOString()}`);
                 matchQuery.createdAt = {
                     $gte: start,
                     $lte: end
                 };
             }
         }
+
+        // First, check total records matching the query
+        const totalMatching = await statusRecordModel.countDocuments(matchQuery);
+        console.log(`📊 Total records matching query for keyId ${keyId}: ${totalMatching}`);
 
         // Get the latest status for each unique instance
         const latestRecords = await statusRecordModel.aggregate([
@@ -68,6 +73,7 @@ export class StatusRecordDao {
             { $sort: { instanceName: 1 } }
         ]);
 
+        console.log(`✅ Returning ${latestRecords.length} unique instances after grouping`);
         return latestRecords;
     }
 

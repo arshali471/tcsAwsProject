@@ -50,7 +50,9 @@ export class UserController {
 
             res.send({
                 token,
-                username: user.username
+                username: user.username,
+                email: user.email,
+                admin: user.admin || false
             });
         } catch (err) {
             next(err);

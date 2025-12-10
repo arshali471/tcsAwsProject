@@ -1628,7 +1628,7 @@ $result | ConvertTo-Json -Compress
                 };
                 console.log("ℹ️ No Windows credentials provided - checking Linux servers only");
             }
-
+                        
             let allResults: any[] = [];
 
             for (let sshUsername of sshUsernames) {

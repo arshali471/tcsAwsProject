@@ -7,7 +7,9 @@ import { AwsVolumesController } from '../controllers/awsVolumesController';
 import { AwsCostController } from '../controllers/awsCostController';
 import { adminAuthMiddleware } from '../middleware/AdminAuthMiddleware';
 import { AdminController } from '../controllers/adminController';
-import { upload } from '../helper/fileUploader';
+import { upload, uploadToMemory } from '../helper/fileUploader';
+import { CronController } from '../controllers/cronController';
+import { DocumentationController } from '../controllers/documentationController';
 
 export default class AwsRouter {
     public router: Router;
@@ -34,6 +36,9 @@ export default class AwsRouter {
 
         // Agent Status Dashboard (NEW - auto-fetch from DB, supports Windows credentials in body)
         this.router.post("/getAgentStatusDashboard/:keyId", authMiddleware(), AwsController.getAgentStatusDashboard)
+
+        // Manual trigger for cron job to populate agent status data (Admin only)
+        this.router.post("/cron/triggerAgentStatus", adminAuthMiddleware(), CronController.getAllAgentStatus)
 
         // Check the zabbix-status (OLD - requires sshUsername, sshKeyPath, operatingSystem)
         this.router.get("/getZabbixStatus/:keyId", authMiddleware(), AwsController.getZabbixStatus)
@@ -78,5 +83,15 @@ export default class AwsRouter {
         // SSH to instance
         this.router.post("/ssh", upload.single("sshkey"), AwsController.sshToInstance);
         this.router.get("/terminal/:sessionId", AwsController.getTerminalSession);
+
+        // Documentation Management
+        this.router.post("/documentation/upload", adminAuthMiddleware(), uploadToMemory.single("file"), DocumentationController.uploadDocumentation);
+        this.router.get("/documentation/categories", authMiddleware(), DocumentationController.getCategories);
+        this.router.get("/documentation", authMiddleware(), DocumentationController.getAllDocumentation);
+        this.router.get("/documentation/:id", authMiddleware(), DocumentationController.getDocumentationById);
+        this.router.put("/documentation/:id", adminAuthMiddleware(), DocumentationController.updateDocumentation);
+        this.router.delete("/documentation/:id", adminAuthMiddleware(), DocumentationController.deleteDocumentation);
+        this.router.post("/documentation/share/:id", authMiddleware(), DocumentationController.shareDocument);
+        this.router.delete("/documentation/share/:id/:email", authMiddleware(), DocumentationController.removeShareAccess);
     }
 }

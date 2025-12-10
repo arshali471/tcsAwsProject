@@ -16,3 +16,13 @@ export const upload = multer({
         fileSize: 1024 * 1024 * 1024 * 2
     },
 });
+
+// Memory storage for S3 uploads (documentation, etc.)
+const memoryStorage = multer.memoryStorage();
+
+export const uploadToMemory = multer({
+    storage: memoryStorage,
+    limits: {
+        fileSize: 1024 * 1024 * 100 // 100MB limit for documentation files
+    },
+});
