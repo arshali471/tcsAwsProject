@@ -278,4 +278,37 @@ export class AwsCostController {
             });
         }
     }
+
+    /**
+     * GET /api/v1/aws/cost/bedrock/:keyId
+     * Get AWS Bedrock model usage and costs
+     * Query params: ?days=30 (optional, default 30)
+     */
+    static async getBedrockCosts(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const keyId = req.params.keyId;
+            const days = parseInt(req.query.days as string) || 30;
+
+            const bedrockData = await AWSCostService.getBedrockCosts(keyId, days);
+
+            res.status(200).json({
+                success: true,
+                data: bedrockData,
+            });
+        } catch (err: any) {
+            console.error("Error fetching Bedrock costs:", err);
+            return res.status(403).json({
+                success: false,
+                message: err.message || "Failed to fetch Bedrock costs",
+                errorType: err.name || "Unknown Error",
+                details: err.message && err.message.includes("is not authorized")
+                    ? {
+                        error: err.message,
+                        hint: "IAM permissions required for ce:GetCostAndUsage",
+                        requiredPermissions: ["ce:GetCostAndUsage"]
+                    }
+                    : null
+            });
+        }
+    }
 }

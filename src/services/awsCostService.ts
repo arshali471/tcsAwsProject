@@ -346,4 +346,167 @@ export class AWSCostService {
             throw error;
         }
     }
+
+    /**
+     * Get AWS Bedrock model usage and costs
+     * @param keyId - AWS Key ID
+     * @param days - Number of days to look back (default 30)
+     */
+    static async getBedrockCosts(keyId: string, days: number = 30) {
+        try {
+            const awsConfig = await AWSKeyService.getAWSKeyById(keyId);
+            const costExplorerClient = new CostExplorerClient(awsConfig);
+
+            const endDate = DateTime.now().toISODate();
+            const startDate = DateTime.now().minus({ days }).toISODate();
+
+            // Get Bedrock costs filtered by service
+            const command = new GetCostAndUsageCommand({
+                TimePeriod: {
+                    Start: startDate!,
+                    End: endDate!,
+                },
+                Granularity: "DAILY",
+                Metrics: ["UnblendedCost", "UsageQuantity"],
+                Filter: {
+                    Dimensions: {
+                        Key: "SERVICE",
+                        Values: ["Amazon Bedrock"],
+                    },
+                },
+                GroupBy: [
+                    {
+                        Type: "DIMENSION",
+                        Key: "USAGE_TYPE",
+                    },
+                ],
+            });
+
+            const response = await costExplorerClient.send(command);
+
+            // Process Bedrock costs by usage type (model)
+            const modelMap = new Map<string, any>();
+            const dailyCostsMap = new Map<string, number>();
+
+            response.ResultsByTime?.forEach((timeData) => {
+                const date = timeData.TimePeriod?.Start || "";
+                let dailyTotal = 0;
+
+                timeData.Groups?.forEach((group) => {
+                    const usageType = group.Keys?.[0] || "Unknown";
+                    const cost = parseFloat(group.Metrics?.UnblendedCost?.Amount || "0");
+                    const usage = parseFloat(group.Metrics?.UsageQuantity?.Amount || "0");
+
+                    dailyTotal += cost;
+
+                    // Extract model information from usage type
+                    // Bedrock usage types typically contain model identifiers
+                    const modelInfo = this.extractBedrockModelInfo(usageType);
+
+                    if (!modelMap.has(modelInfo.modelName)) {
+                        modelMap.set(modelInfo.modelName, {
+                            modelName: modelInfo.modelName,
+                            provider: modelInfo.provider,
+                            inputTokens: 0,
+                            outputTokens: 0,
+                            totalRequests: 0,
+                            totalCost: 0,
+                            currency: group.Metrics?.UnblendedCost?.Unit || "USD",
+                            usageTypes: [],
+                        });
+                    }
+
+                    const modelData = modelMap.get(modelInfo.modelName);
+                    modelData.totalCost += cost;
+                    modelData.totalRequests += usage;
+
+                    // Parse token information from usage type if available
+                    if (usageType.toLowerCase().includes("input")) {
+                        modelData.inputTokens += usage;
+                    } else if (usageType.toLowerCase().includes("output")) {
+                        modelData.outputTokens += usage;
+                    }
+
+                    if (!modelData.usageTypes.includes(usageType)) {
+                        modelData.usageTypes.push(usageType);
+                    }
+                });
+
+                dailyCostsMap.set(date, (dailyCostsMap.get(date) || 0) + dailyTotal);
+            });
+
+            // Convert maps to arrays and sort
+            const modelsArray = Array.from(modelMap.values())
+                .map(model => ({
+                    ...model,
+                    totalCost: parseFloat(model.totalCost.toFixed(2)),
+                    totalRequests: parseFloat(model.totalRequests.toFixed(2)),
+                    inputTokens: parseFloat(model.inputTokens.toFixed(2)),
+                    outputTokens: parseFloat(model.outputTokens.toFixed(2)),
+                }))
+                .sort((a, b) => b.totalCost - a.totalCost);
+
+            const dailyCostsArray = Array.from(dailyCostsMap.entries())
+                .map(([date, cost]) => ({
+                    date,
+                    cost: parseFloat(cost.toFixed(2)),
+                }))
+                .sort((a, b) => a.date.localeCompare(b.date));
+
+            const totalCost = modelsArray.reduce((sum, model) => sum + model.totalCost, 0);
+            const totalRequests = modelsArray.reduce((sum, model) => sum + model.totalRequests, 0);
+
+            // Calculate estimated monthly cost based on daily average
+            const avgDailyCost = totalCost / days;
+            const estimatedMonthlyCost = (avgDailyCost * 30).toFixed(2);
+
+            return {
+                totalCost: totalCost.toFixed(2),
+                estimatedMonthlyCost,
+                totalRequests: totalRequests.toFixed(2),
+                currency: modelsArray[0]?.currency || "USD",
+                period: { startDate: startDate!, endDate: endDate! },
+                models: modelsArray,
+                dailyCosts: dailyCostsArray,
+            };
+        } catch (error: any) {
+            console.error("Error fetching Bedrock costs:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Extract model information from Bedrock usage type
+     * @param usageType - AWS usage type string
+     * @returns Object with modelName and provider
+     */
+    private static extractBedrockModelInfo(usageType: string): { modelName: string; provider: string } {
+        // Common Bedrock model patterns in usage types
+        const modelPatterns = [
+            { pattern: /anthropic\.claude/i, provider: "Anthropic", name: "Claude" },
+            { pattern: /anthropic/i, provider: "Anthropic", name: "Claude" },
+            { pattern: /ai21/i, provider: "AI21 Labs", name: "Jurassic" },
+            { pattern: /amazon\.titan/i, provider: "Amazon", name: "Titan" },
+            { pattern: /cohere/i, provider: "Cohere", name: "Cohere" },
+            { pattern: /meta\.llama/i, provider: "Meta", name: "Llama" },
+            { pattern: /stability/i, provider: "Stability AI", name: "Stable Diffusion" },
+        ];
+
+        for (const { pattern, provider, name } of modelPatterns) {
+            if (pattern.test(usageType)) {
+                // Try to extract more specific model name from usage type
+                const specificName = usageType.match(/\.([\w-]+)/)?.[1] || name;
+                return {
+                    modelName: specificName.charAt(0).toUpperCase() + specificName.slice(1).replace(/-/g, " "),
+                    provider,
+                };
+            }
+        }
+
+        // Default fallback
+        return {
+            modelName: "Unknown Model",
+            provider: "Unknown Provider",
+        };
+    }
 }
