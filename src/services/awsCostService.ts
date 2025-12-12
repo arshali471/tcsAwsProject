@@ -361,6 +361,7 @@ export class AWSCostService {
             const startDate = DateTime.now().minus({ days }).toISODate();
 
             // Get Bedrock costs filtered by service
+            // Note: We'll try multiple groupings to get the best model information
             const command = new GetCostAndUsageCommand({
                 TimePeriod: {
                     Start: startDate!,
@@ -481,32 +482,158 @@ export class AWSCostService {
      * @returns Object with modelName and provider
      */
     private static extractBedrockModelInfo(usageType: string): { modelName: string; provider: string } {
-        // Common Bedrock model patterns in usage types
-        const modelPatterns = [
-            { pattern: /anthropic\.claude/i, provider: "Anthropic", name: "Claude" },
-            { pattern: /anthropic/i, provider: "Anthropic", name: "Claude" },
-            { pattern: /ai21/i, provider: "AI21 Labs", name: "Jurassic" },
-            { pattern: /amazon\.titan/i, provider: "Amazon", name: "Titan" },
-            { pattern: /cohere/i, provider: "Cohere", name: "Cohere" },
-            { pattern: /meta\.llama/i, provider: "Meta", name: "Llama" },
-            { pattern: /stability/i, provider: "Stability AI", name: "Stable Diffusion" },
-        ];
+        // AWS Bedrock usage types typically follow patterns like:
+        // - "USE1-ModelInference-Anthropic-Claude-V2"
+        // - "USE1-ModelInference-Amazon-Titan-Text"
+        // - "Model-Anthropic-Claude-3-Sonnet"
+        // - Region code + service + provider + model details
 
-        for (const { pattern, provider, name } of modelPatterns) {
-            if (pattern.test(usageType)) {
-                // Try to extract more specific model name from usage type
-                const specificName = usageType.match(/\.([\w-]+)/)?.[1] || name;
-                return {
-                    modelName: specificName.charAt(0).toUpperCase() + specificName.slice(1).replace(/-/g, " "),
-                    provider,
-                };
+        console.log("Parsing Bedrock usage type:", usageType);
+
+        // Try to extract from common patterns
+        const lowerUsageType = usageType.toLowerCase();
+
+        // Anthropic Claude models
+        if (lowerUsageType.includes('anthropic') || lowerUsageType.includes('claude')) {
+            let modelName = "Claude";
+
+            // Try to get specific Claude version
+            if (lowerUsageType.includes('claude-3-5-sonnet') || lowerUsageType.includes('claude-3.5-sonnet')) {
+                modelName = "Claude 3.5 Sonnet";
+            } else if (lowerUsageType.includes('claude-3-sonnet')) {
+                modelName = "Claude 3 Sonnet";
+            } else if (lowerUsageType.includes('claude-3-opus')) {
+                modelName = "Claude 3 Opus";
+            } else if (lowerUsageType.includes('claude-3-haiku')) {
+                modelName = "Claude 3 Haiku";
+            } else if (lowerUsageType.includes('claude-v2') || lowerUsageType.includes('claude-2')) {
+                modelName = "Claude 2";
+            } else if (lowerUsageType.includes('claude-instant')) {
+                modelName = "Claude Instant";
             }
+
+            return { modelName, provider: "Anthropic" };
         }
 
-        // Default fallback
+        // Amazon Titan models
+        if (lowerUsageType.includes('titan')) {
+            let modelName = "Titan";
+
+            if (lowerUsageType.includes('titan-text-express')) {
+                modelName = "Titan Text Express";
+            } else if (lowerUsageType.includes('titan-text-lite')) {
+                modelName = "Titan Text Lite";
+            } else if (lowerUsageType.includes('titan-text')) {
+                modelName = "Titan Text";
+            } else if (lowerUsageType.includes('titan-embed')) {
+                modelName = "Titan Embeddings";
+            } else if (lowerUsageType.includes('titan-image')) {
+                modelName = "Titan Image Generator";
+            } else if (lowerUsageType.includes('titan-multimodal')) {
+                modelName = "Titan Multimodal Embeddings";
+            }
+
+            return { modelName, provider: "Amazon" };
+        }
+
+        // Meta Llama models
+        if (lowerUsageType.includes('llama') || lowerUsageType.includes('meta')) {
+            let modelName = "Llama";
+
+            if (lowerUsageType.includes('llama-3-1') || lowerUsageType.includes('llama-3.1')) {
+                if (lowerUsageType.includes('70b')) {
+                    modelName = "Llama 3.1 70B";
+                } else if (lowerUsageType.includes('8b')) {
+                    modelName = "Llama 3.1 8B";
+                } else {
+                    modelName = "Llama 3.1";
+                }
+            } else if (lowerUsageType.includes('llama-3')) {
+                if (lowerUsageType.includes('70b')) {
+                    modelName = "Llama 3 70B";
+                } else if (lowerUsageType.includes('8b')) {
+                    modelName = "Llama 3 8B";
+                } else {
+                    modelName = "Llama 3";
+                }
+            } else if (lowerUsageType.includes('llama-2')) {
+                if (lowerUsageType.includes('70b')) {
+                    modelName = "Llama 2 70B";
+                } else if (lowerUsageType.includes('13b')) {
+                    modelName = "Llama 2 13B";
+                } else if (lowerUsageType.includes('7b')) {
+                    modelName = "Llama 2 7B";
+                } else {
+                    modelName = "Llama 2";
+                }
+            }
+
+            return { modelName, provider: "Meta" };
+        }
+
+        // AI21 Labs models
+        if (lowerUsageType.includes('ai21') || lowerUsageType.includes('jurassic')) {
+            let modelName = "Jurassic";
+
+            if (lowerUsageType.includes('jurassic-2-ultra')) {
+                modelName = "Jurassic-2 Ultra";
+            } else if (lowerUsageType.includes('jurassic-2-mid')) {
+                modelName = "Jurassic-2 Mid";
+            }
+
+            return { modelName, provider: "AI21 Labs" };
+        }
+
+        // Cohere models
+        if (lowerUsageType.includes('cohere')) {
+            let modelName = "Cohere";
+
+            if (lowerUsageType.includes('command')) {
+                modelName = "Command";
+            } else if (lowerUsageType.includes('embed')) {
+                modelName = "Embed";
+            }
+
+            return { modelName, provider: "Cohere" };
+        }
+
+        // Stability AI models
+        if (lowerUsageType.includes('stability') || lowerUsageType.includes('stable-diffusion')) {
+            let modelName = "Stable Diffusion";
+
+            if (lowerUsageType.includes('sdxl')) {
+                modelName = "Stable Diffusion XL";
+            } else if (lowerUsageType.includes('sd3')) {
+                modelName = "Stable Diffusion 3";
+            }
+
+            return { modelName, provider: "Stability AI" };
+        }
+
+        // Mistral AI models
+        if (lowerUsageType.includes('mistral')) {
+            let modelName = "Mistral";
+
+            if (lowerUsageType.includes('mistral-7b')) {
+                modelName = "Mistral 7B";
+            } else if (lowerUsageType.includes('mixtral-8x7b')) {
+                modelName = "Mixtral 8x7B";
+            }
+
+            return { modelName, provider: "Mistral AI" };
+        }
+
+        // If we can't determine the model, use the usage type itself
+        // This ensures we always show something rather than "Unknown"
+        const cleanedName = usageType
+            .replace(/^[A-Z]{2,4}\d+-/i, '') // Remove region prefix
+            .replace(/ModelInference-/gi, '')
+            .replace(/-/g, ' ')
+            .trim();
+
         return {
-            modelName: "Unknown Model",
-            provider: "Unknown Provider",
+            modelName: cleanedName || "Bedrock Service",
+            provider: "AWS Bedrock",
         };
     }
 }
