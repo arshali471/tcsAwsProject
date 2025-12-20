@@ -4,6 +4,7 @@ import morgan from 'morgan';
 import express from 'express'
 import * as path from 'path';
 import { IServer } from '../lib/interfaces';
+import { apiLoggingMiddleware } from '../middleware/ApiLoggingMiddleware';
 
 export default class Middleware {
     static init(server: IServer): void {
@@ -13,6 +14,9 @@ export default class Middleware {
         server.app.use(express.json());
         server.app.use(cors());
         server.app.use(morgan('dev'));
+
+        // API logging middleware
+        server.app.use(apiLoggingMiddleware());
 
         // DB debug
         // mongoose.set('debug', true);

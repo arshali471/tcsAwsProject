@@ -35,9 +35,20 @@ export class AWSKeyDao {
     }
 
     static async updateApiKey(payload: any, id: any) {
-        return await awsKeysModel.findByIdAndUpdate({ _id: id }, {
-            $set: payload
-        }, { new: true })
+        // For encrypted models, we need to fetch, modify, and save to ensure proper encryption
+        const awsKey = await awsKeysModel.findById(id);
+        if (!awsKey) {
+            return null;
+        }
+
+        // Update only the provided fields
+        Object.keys(payload).forEach(key => {
+            (awsKey as any)[key] = payload[key];
+        });
+
+        // Save will trigger mongoose-encryption to re-encrypt all fields
+        const savedKey = await awsKey.save();
+        return savedKey;
     }
 
     static async deleteAWSKey(id: any) {

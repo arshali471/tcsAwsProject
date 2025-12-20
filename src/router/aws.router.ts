@@ -79,7 +79,13 @@ export default class AwsRouter {
         this.router.get("/cost/forecast/:keyId", authMiddleware(), AwsCostController.getCostForecast)
         this.router.get("/cost/compare/:keyId", authMiddleware(), AwsCostController.compareCosts)
         this.router.get("/cost/top-services/:keyId", authMiddleware(), AwsCostController.getTopServices)
+
+        // Bedrock Cost & Pricing
         this.router.get("/cost/bedrock/:keyId", authMiddleware(), AwsCostController.getBedrockCosts)
+        this.router.get("/cost/bedrock-pricing/:keyId", authMiddleware(), AwsCostController.getBedrockPricing)
+        this.router.get("/cost/bedrock-cost-analysis/:keyId", authMiddleware(), AwsCostController.getBedrockCostAnalysis)
+        this.router.post("/cost/bedrock-calculate/:keyId", authMiddleware(), AwsCostController.calculateBedrockCost)
+        this.router.post("/cost/bedrock-pricing/clear-cache", adminAuthMiddleware(), AwsCostController.clearBedrockPricingCache)
 
         // SSH to instance
         this.router.post("/ssh", upload.single("sshkey"), AwsController.sshToInstance);

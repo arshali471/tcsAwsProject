@@ -1,5 +1,6 @@
 import express from "express";
 import { AWSCostService } from "../services/awsCostService";
+import { BedrockPricingService } from "../services/bedrockPricingService";
 import { DateTime } from "luxon";
 
 export class AwsCostController {
@@ -281,7 +282,7 @@ export class AwsCostController {
 
     /**
      * GET /api/v1/aws/cost/bedrock/:keyId
-     * Get AWS Bedrock model usage and costs
+     * Get AWS Bedrock model usage and costs from Cost Explorer
      * Query params: ?days=30 (optional, default 30)
      */
     static async getBedrockCosts(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -311,4 +312,149 @@ export class AwsCostController {
             });
         }
     }
+
+    /**
+     * GET /api/v1/aws/cost/bedrock-pricing/:keyId
+     * Get Bedrock model pricing (per 1000 tokens) from AWS Pricing API
+     * Returns pricing for all available models in the region
+     */
+    static async getBedrockPricing(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const keyId = req.params.keyId;
+
+            const pricingSummary = await BedrockPricingService.getPricingSummary(keyId);
+
+            res.status(200).json({
+                success: true,
+                data: pricingSummary,
+                message: "Bedrock pricing retrieved successfully",
+            });
+        } catch (err: any) {
+            console.error("Error fetching Bedrock pricing:", err);
+            return res.status(500).json({
+                success: false,
+                message: err.message || "Failed to fetch Bedrock pricing",
+                errorType: err.name || "Unknown Error",
+                details: err.message && err.message.includes("is not authorized")
+                    ? {
+                        error: err.message,
+                        hint: "IAM permissions required for pricing:GetProducts",
+                        requiredPermissions: ["pricing:GetProducts"]
+                    }
+                    : null
+            });
+        }
+    }
+
+    /**
+     * POST /api/v1/aws/cost/bedrock-calculate/:keyId
+     * Calculate cost for specific Bedrock model usage
+     * Body: { modelId: string, inputTokens: number, outputTokens: number }
+     */
+    static async calculateBedrockCost(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const keyId = req.params.keyId;
+            const { modelId, inputTokens, outputTokens } = req.body;
+
+            if (!modelId || inputTokens === undefined || outputTokens === undefined) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Missing required fields: modelId, inputTokens, outputTokens",
+                });
+            }
+
+            const pricing = await BedrockPricingService.getModelPricing(keyId, modelId);
+
+            if (!pricing) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Pricing not found for model: ${modelId}`,
+                    hint: "Check if the model is available in your region or verify the model ID",
+                });
+            }
+
+            const totalCost = BedrockPricingService.calculateModelCost(
+                modelId,
+                inputTokens,
+                outputTokens,
+                pricing
+            );
+
+            const inputCost = (inputTokens / 1000) * pricing.input;
+            const outputCost = (outputTokens / 1000) * pricing.output;
+
+            res.status(200).json({
+                success: true,
+                data: {
+                    modelId,
+                    inputTokens,
+                    outputTokens,
+                    pricing: {
+                        inputPer1kTokens: pricing.input.toFixed(6),
+                        outputPer1kTokens: pricing.output.toFixed(6),
+                        currency: "USD",
+                    },
+                    costs: {
+                        inputCost: inputCost.toFixed(6),
+                        outputCost: outputCost.toFixed(6),
+                        totalCost: totalCost.toFixed(6),
+                        currency: "USD",
+                    },
+                },
+            });
+        } catch (err: any) {
+            console.error("Error calculating Bedrock cost:", err);
+            return res.status(500).json({
+                success: false,
+                message: err.message || "Failed to calculate Bedrock cost",
+            });
+        }
+    }
+
+    /**
+     * POST /api/v1/aws/cost/bedrock-pricing/clear-cache
+     * Clear Bedrock pricing cache (admin only)
+     */
+    static async clearBedrockPricingCache(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            BedrockPricingService.clearCache();
+
+            res.status(200).json({
+                success: true,
+                message: "Bedrock pricing cache cleared successfully",
+            });
+        } catch (err: any) {
+            console.error("Error clearing Bedrock pricing cache:", err);
+            return res.status(500).json({
+                success: false,
+                message: err.message || "Failed to clear cache",
+            });
+        }
+    }
+
+    /**
+     * GET /api/v1/aws/cost/bedrock-cost-analysis/:keyId?days=30
+     * Get combined Bedrock cost analysis with actual usage and pricing
+     * Shows only models that have been used with their pricing information
+     */
+    static async getBedrockCostAnalysis(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const { keyId } = req.params;
+            const days = parseInt(req.query.days as string) || 30;
+
+            const costAnalysis = await BedrockPricingService.getBedrockCostAnalysis(keyId, days);
+
+            res.status(200).json({
+                success: true,
+                data: costAnalysis,
+            });
+        } catch (err: any) {
+            console.error("Error fetching Bedrock cost analysis:", err);
+            return res.status(500).json({
+                success: false,
+                message: err.message || "Failed to fetch Bedrock cost analysis",
+            });
+        }
+    }
 }
+

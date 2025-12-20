@@ -3,6 +3,7 @@ import { IServer } from '../lib/interfaces';
 import AwsRouter from './aws.router';
 import AwsKeysRouter from './awsKeys.router';
 import UserRouter from './user.rouer';
+import ApiLogsRouter from './apiLogs.router';
 
 export default class Routes {
 
@@ -27,9 +28,10 @@ export default class Routes {
         });
         // apikey
         // server.app.use('/api/v1/apikey', new ApikeyRouter().router);
-        server.app.use("/api/v1/aws", new AwsRouter().router); 
-        server.app.use("/api/v1/awsKey", new AwsKeysRouter().router); 
-        server.app.use("/api/v1/user", new UserRouter().router); 
+        server.app.use("/api/v1/aws", new AwsRouter().router);
+        server.app.use("/api/v1/awsKey", new AwsKeysRouter().router);
+        server.app.use("/api/v1/user", new UserRouter().router);
+        server.app.use("/api/v1/api-logs", new ApiLogsRouter().router);
 
 
     }

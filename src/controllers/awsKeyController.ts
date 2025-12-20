@@ -48,21 +48,24 @@ export class AwsKeyController {
 
     static async updateApiKey(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
-            const user = req.user; 
-            const id = req.params.id; 
+            const user = req.user;
+            const id = req.params.id;
+
             if (!user.addAWSKey) {
                 return res.status(400).send("User not allowed to add AWS Key.")
             }
-            
-            const keyData = req.body; 
-            keyData.updatedBy = user._id; 
+
+            const keyData = req.body;
+            keyData.updatedBy = (user as any)._id;
 
             const createdAwsKey = await AWSKeyService.updateApiKey(keyData, id);
             if (!createdAwsKey) {
                 return res.status(404).send("AWS Key data not created.")
             }
+
             res.status(200).send("Key updated successfully.");
         } catch (err) {
+            console.error("Update AWS Key - Error:", err);
             next(err);
         }
     }
