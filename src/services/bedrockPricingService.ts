@@ -48,29 +48,48 @@ export class BedrockPricingService {
                 credentials: awsConfig.credentials
             });
 
-            const command = new GetProductsCommand({
-                ServiceCode: "AmazonBedrock",
-                Filters: [
-                    {
-                        Type: "TERM_MATCH",
-                        Field: "regionCode",
-                        Value: region,
-                    },
-                    {
-                        Type: "TERM_MATCH",
-                        Field: "productFamily",
-                        Value: "Generative AI Inference",
-                    },
-                ],
-                MaxResults: 100,
-            });
+            // Fetch all inference models with pagination
+            let allPriceItems: any[] = [];
+            let nextToken: string | undefined = undefined;
 
-            const response = await pricingClient.send(command);
+            do {
+                const commandInput: any = {
+                    ServiceCode: "AmazonBedrock",
+                    Filters: [
+                        {
+                            Type: "TERM_MATCH",
+                            Field: "regionCode",
+                            Value: region,
+                        },
+                        {
+                            Type: "TERM_MATCH",
+                            Field: "productFamily",
+                            Value: "Generative AI Inference",
+                        },
+                    ],
+                    MaxResults: 100,
+                };
+
+                if (nextToken) {
+                    commandInput.NextToken = nextToken;
+                }
+
+                const command = new GetProductsCommand(commandInput);
+                const pricingResponse = await pricingClient.send(command);
+
+                if (pricingResponse.PriceList) {
+                    allPriceItems = allPriceItems.concat(pricingResponse.PriceList);
+                }
+
+                nextToken = (pricingResponse as any).NextToken;
+            } while (nextToken);
 
             const modelPricing: ModelPricing = {};
 
+            console.log(`[Bedrock Pricing] Fetched ${allPriceItems.length} pricing items for region ${region}`);
+
             // Process each pricing item
-            response.PriceList?.forEach((priceItem: any) => {
+            allPriceItems.forEach((priceItem: any) => {
                 const priceData = typeof priceItem === 'string' ? JSON.parse(priceItem) : priceItem;
 
                 const product = priceData.product;
@@ -115,6 +134,9 @@ export class BedrockPricingService {
             }
             this.pricingCache[region] = modelPricing;
             this.cacheTimestamp = Date.now();
+
+            const modelCount = Object.keys(modelPricing).length;
+            console.log(`[Bedrock Pricing] Processed ${modelCount} unique models for region ${region}`);
 
             return modelPricing;
         } catch (error: any) {
