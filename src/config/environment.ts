@@ -32,6 +32,12 @@ export const CONFIG = {
         accessKeyId: process.env.accessKeyId,
         secretAccessKey: process.env.secretAccessKey
     },
+    azure: {
+        clientId: process.env.AZURE_CLIENT_ID || '',
+        clientSecret: process.env.AZURE_CLIENT_SECRET || '',
+        tenantId: process.env.AZURE_TENANT_ID || '',
+        redirectUri: process.env.AZURE_REDIRECT_URI || 'http://localhost:5173/auth/callback',
+    },
     uploadsFolderPath: path.resolve(__dirname, '../../uploads'),
     sshKeyFolderPath: path.resolve(__dirname, '../../ssh-key'),
     agentStatusFolderPath: path.resolve(__dirname, '../../agent-status'),

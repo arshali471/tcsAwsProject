@@ -42,6 +42,18 @@ export class UserService {
     static async getUserByEmail(email: string) {
         return await UserDao.getUserByEmail(email);
     }
+
+    static async getUserByAzureOid(azureOid: string) {
+        return await UserDao.getUserByAzureOid(azureOid);
+    }
+
+    static async createSSOUser(payload: any) {
+        return await UserDao.createSSOUser(payload);
+    }
+
+    static async updateLastLogin(userId: any) {
+        return await UserDao.updateLastLogin(userId);
+    }
 }
 
 

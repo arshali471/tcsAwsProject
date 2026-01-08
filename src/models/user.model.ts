@@ -9,29 +9,51 @@ export interface IUser extends Document {
     admin: boolean
     addUser: boolean
     addAWSKey: boolean
+    // SSO fields
+    ssoProvider?: 'azure' | 'local'
+    azureOid?: string
+    displayName?: string
+    department?: string
+    jobTitle?: string
+    lastLogin?: Date
 }
 
 const UserSchema = new Schema<IUser>({
     email: String,
     phone: String,
-    username: String, 
-    password: String, 
+    username: String,
+    password: { type: String, required: false },
     isActive: {
-        type: Boolean, 
+        type: Boolean,
         default: true
-    }, 
+    },
     admin: {
-        type: Boolean, 
+        type: Boolean,
         default: false
-    }, 
+    },
     addUser: {
-        type: Boolean, 
+        type: Boolean,
         default: false
-    }, 
+    },
     addAWSKey: {
-        type: Boolean, 
+        type: Boolean,
         default: false
-    }
+    },
+    // SSO fields
+    ssoProvider: {
+        type: String,
+        enum: ['azure', 'local'],
+        default: 'local'
+    },
+    azureOid: {
+        type: String,
+        sparse: true,
+        unique: true
+    },
+    displayName: String,
+    department: String,
+    jobTitle: String,
+    lastLogin: Date
 },
     {
         versionKey: false,
@@ -39,5 +61,9 @@ const UserSchema = new Schema<IUser>({
         collection: "user"
     }
 );
+
+// Add indexes for SSO
+UserSchema.index({ ssoProvider: 1, azureOid: 1 });
+UserSchema.index({ email: 1 });
 
 export default model<IUser>("user", UserSchema)

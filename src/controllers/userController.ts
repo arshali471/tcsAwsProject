@@ -42,9 +42,18 @@ export class UserController {
             if (!user) {
                 return res.status(404).send("No user found.")
             }
+
+            // Check if user is SSO-only (no password set)
+            if (user.ssoProvider === 'azure' && !user.password) {
+                return res.status(400).send("This account uses Microsoft SSO. Please sign in with Microsoft.");
+            }
+
             if (!Utility.comparePasswordHash(user.password, password)) {
                 throwError("Incorrect password", 400);
             }
+
+            // Update last login
+            await UserService.updateLastLogin(user._id);
 
             let token = Utility.generateJwtToken(user?._id);
 

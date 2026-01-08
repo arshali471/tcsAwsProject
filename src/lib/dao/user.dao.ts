@@ -22,15 +22,27 @@ export class UserDao {
     }
 
     static async updateUser(userId: any, payload: any) {
-        const user: any = await userModel.findById({_id: userId}); 
-        return await userModel.findByIdAndUpdate({ _id: userId }, {
-            $set: {
-                isActive: payload.isActive  !== undefined ? payload.isActive : user.isActive, 
-                admin: payload.admin !== undefined ? payload.admin : user.admin , 
-                addUser: payload.addUser !== undefined ? payload.addUser : user.addUser, 
-                addAWSKey: payload.addAWSKey !== undefined ? payload.addAWSKey : user.addAWSKey
-            }
-        }, { new: true }).select("-password")
+        const user: any = await userModel.findById({_id: userId});
+        const updateFields: any = {
+            isActive: payload.isActive  !== undefined ? payload.isActive : user.isActive,
+            admin: payload.admin !== undefined ? payload.admin : user.admin,
+            addUser: payload.addUser !== undefined ? payload.addUser : user.addUser,
+            addAWSKey: payload.addAWSKey !== undefined ? payload.addAWSKey : user.addAWSKey
+        };
+
+        // Handle SSO fields
+        if (payload.ssoProvider !== undefined) updateFields.ssoProvider = payload.ssoProvider;
+        if (payload.azureOid !== undefined) updateFields.azureOid = payload.azureOid;
+        if (payload.displayName !== undefined) updateFields.displayName = payload.displayName;
+        if (payload.department !== undefined) updateFields.department = payload.department;
+        if (payload.jobTitle !== undefined) updateFields.jobTitle = payload.jobTitle;
+        if (payload.lastLogin !== undefined) updateFields.lastLogin = payload.lastLogin;
+
+        return await userModel.findByIdAndUpdate(
+            { _id: userId },
+            { $set: updateFields },
+            { new: true }
+        ).select("-password")
     }
 
     static async deleteUser(userId: any) {
@@ -55,5 +67,39 @@ export class UserDao {
 
     static async getUserPassword(userId: any) {
         return await userModel.findById(userId, "password");
+    }
+
+    static async getUserByAzureOid(azureOid: string) {
+        return await userModel.findOne({
+            azureOid,
+            ssoProvider: 'azure'
+        });
+    }
+
+    static async createSSOUser(payload: {
+        email: string,
+        username: string,
+        displayName?: string,
+        azureOid: string,
+        department?: string,
+        jobTitle?: string,
+        ssoProvider: 'azure'
+    }) {
+        return await userModel.create({
+            ...payload,
+            isActive: true,
+            admin: false,
+            addUser: false,
+            addAWSKey: false,
+            lastLogin: new Date()
+        });
+    }
+
+    static async updateLastLogin(userId: any) {
+        return await userModel.findByIdAndUpdate(
+            { _id: userId },
+            { $set: { lastLogin: new Date() } },
+            { new: true }
+        ).select("-password");
     }
 }

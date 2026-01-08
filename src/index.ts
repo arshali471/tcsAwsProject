@@ -4,6 +4,7 @@ import { normalizePort, onError } from "./serverHandler";
 import fs from 'fs';
 import { CONFIG } from "./config/environment";
 import "./services/cronJob/fetchInstance.cron";
+import { AzureAdService } from "./services/azureAdService";
 
 import { Client } from "ssh2";
 import { WebSocketServer } from "ws";
@@ -11,6 +12,9 @@ import { WebSocketServer } from "ws";
 const SERVER = new Server();
 const PORT = normalizePort(process.env.PORT || 3000);
 SERVER.app.set("post", PORT);
+
+// Validate Azure AD configuration
+AzureAdService.validateConfig();
 
 const server = http.createServer(SERVER.app);
 

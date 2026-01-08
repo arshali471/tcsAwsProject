@@ -4,6 +4,7 @@ import AwsRouter from './aws.router';
 import AwsKeysRouter from './awsKeys.router';
 import UserRouter from './user.rouer';
 import ApiLogsRouter from './apiLogs.router';
+import AuthRouter from './auth.router';
 
 export default class Routes {
 
@@ -32,6 +33,7 @@ export default class Routes {
         server.app.use("/api/v1/awsKey", new AwsKeysRouter().router);
         server.app.use("/api/v1/user", new UserRouter().router);
         server.app.use("/api/v1/api-logs", new ApiLogsRouter().router);
+        server.app.use("/api/v1/auth", new AuthRouter().router);
 
 
     }
