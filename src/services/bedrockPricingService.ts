@@ -1,5 +1,6 @@
 import { PricingClient, GetProductsCommand } from "@aws-sdk/client-pricing";
 import { AWSKeyService } from "./awsKeyService";
+import { BEDROCK_PRICING_FALLBACK, extractProvider as extractProviderFallback, formatModelName as formatModelNameFallback } from "./bedrockPricingFallback";
 
 /**
  * Bedrock Pricing Service
@@ -39,94 +40,15 @@ export class BedrockPricingService {
             if (this.pricingCache &&
                 this.pricingCache[region] &&
                 Date.now() - this.cacheTimestamp < this.CACHE_DURATION) {
+                console.log(`[Bedrock Pricing] Using cached pricing for region ${region}`);
                 return this.pricingCache[region];
             }
 
-            // AWS Pricing API is only available in us-east-1
-            const pricingClient = new PricingClient({
-                region: "us-east-1",
-                credentials: awsConfig.credentials
-            });
+            console.log(`[Bedrock Pricing] Using fallback pricing data for region ${region}`);
 
-            // Fetch all inference models with pagination
-            let allPriceItems: any[] = [];
-            let nextToken: string | undefined = undefined;
-
-            do {
-                const commandInput: any = {
-                    ServiceCode: "AmazonBedrock",
-                    Filters: [
-                        {
-                            Type: "TERM_MATCH",
-                            Field: "regionCode",
-                            Value: region,
-                        },
-                        {
-                            Type: "TERM_MATCH",
-                            Field: "productFamily",
-                            Value: "Generative AI Inference",
-                        },
-                    ],
-                    MaxResults: 100,
-                };
-
-                if (nextToken) {
-                    commandInput.NextToken = nextToken;
-                }
-
-                const command = new GetProductsCommand(commandInput);
-                const pricingResponse = await pricingClient.send(command);
-
-                if (pricingResponse.PriceList) {
-                    allPriceItems = allPriceItems.concat(pricingResponse.PriceList);
-                }
-
-                nextToken = (pricingResponse as any).NextToken;
-            } while (nextToken);
-
-            const modelPricing: ModelPricing = {};
-
-            console.log(`[Bedrock Pricing] Fetched ${allPriceItems.length} pricing items for region ${region}`);
-
-            // Process each pricing item
-            allPriceItems.forEach((priceItem: any) => {
-                const priceData = typeof priceItem === 'string' ? JSON.parse(priceItem) : priceItem;
-
-                const product = priceData.product;
-                const terms = priceData.terms?.OnDemand;
-
-                if (!terms || !product) return;
-
-                // Extract model information
-                const modelId = product.attributes?.model || product.attributes?.usagetype || "Unknown";
-                const inferenceType = product.attributes?.inferenceType || "";
-
-                // Skip cache-related pricing
-                if (inferenceType.toLowerCase().includes("cache")) return;
-
-                // Determine if this is input or output token pricing
-                const tokenType = this.determineTokenType(inferenceType, product.attributes);
-
-                // Extract price per 1000 tokens
-                const pricePerUnit = this.extractPricePerUnit(terms);
-
-                if (pricePerUnit === null) return;
-
-                // Initialize model pricing if not exists
-                if (!modelPricing[modelId]) {
-                    modelPricing[modelId] = {
-                        input: 0,
-                        output: 0,
-                    };
-                }
-
-                // Assign price to correct token type
-                if (tokenType === "input") {
-                    modelPricing[modelId].input = pricePerUnit;
-                } else if (tokenType === "output") {
-                    modelPricing[modelId].output = pricePerUnit;
-                }
-            });
+            // Use fallback pricing directly instead of AWS Pricing API
+            // AWS Pricing API often returns incomplete results or requires specific IAM permissions
+            const modelPricing: ModelPricing = { ...BEDROCK_PRICING_FALLBACK };
 
             // Update cache
             if (!this.pricingCache) {
@@ -135,10 +57,16 @@ export class BedrockPricingService {
             this.pricingCache[region] = modelPricing;
             this.cacheTimestamp = Date.now();
 
-            const modelCount = Object.keys(modelPricing).length;
-            console.log(`[Bedrock Pricing] Processed ${modelCount} unique models for region ${region}`);
+            console.log(`[Bedrock Pricing] Loaded ${Object.keys(modelPricing).length} models from fallback data`);
 
             return modelPricing;
+
+            /* ORIGINAL CODE - AWS Pricing API (commented out due to unreliable results)
+            // This code was removed because:
+            // 1. AWS Pricing API returns 0 results for Bedrock in most regions
+            // 2. "The security token included in the request is invalid" errors
+            // 3. Hardcoded fallback pricing is more reliable and doesn't require AWS API calls
+            */
         } catch (error: any) {
             console.error("Error fetching Bedrock pricing:", error);
             throw error;
