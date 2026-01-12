@@ -9,6 +9,7 @@ export interface IUser extends Document {
     admin: boolean
     addUser: boolean
     addAWSKey: boolean
+    addDocument: boolean
     // SSO fields
     ssoProvider?: 'azure' | 'local'
     azureOid?: string
@@ -16,6 +17,7 @@ export interface IUser extends Document {
     department?: string
     jobTitle?: string
     lastLogin?: Date
+    lastLogout?: Date
 }
 
 const UserSchema = new Schema<IUser>({
@@ -39,6 +41,10 @@ const UserSchema = new Schema<IUser>({
         type: Boolean,
         default: false
     },
+    addDocument: {
+        type: Boolean,
+        default: false
+    },
     // SSO fields
     ssoProvider: {
         type: String,
@@ -53,7 +59,8 @@ const UserSchema = new Schema<IUser>({
     displayName: String,
     department: String,
     jobTitle: String,
-    lastLogin: Date
+    lastLogin: Date,
+    lastLogout: Date
 },
     {
         versionKey: false,

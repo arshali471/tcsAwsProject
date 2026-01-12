@@ -54,6 +54,10 @@ export class UserService {
     static async updateLastLogin(userId: any) {
         return await UserDao.updateLastLogin(userId);
     }
+
+    static async updateLastLogout(userId: any) {
+        return await UserDao.updateLastLogout(userId);
+    }
 }
 
 

@@ -6,7 +6,7 @@ import { Utility, throwError } from "../util/util";
 export class UserController {
     static async createUser(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
-            let { username, password, admin, addUser, addAWSKey } = req.body;
+            let { username, password, email, admin, addUser, addAWSKey, addDocument } = req.body;
 
             password = await Utility.createPasswordHash(password);
 
@@ -16,7 +16,7 @@ export class UserController {
                 return res.status(404).send("User already present with same username.")
             }
 
-            const userData = await UserService.createUser({ username, password, admin, addUser, addAWSKey });
+            const userData = await UserService.createUser({ username, password, email, admin, addUser, addAWSKey, addDocument });
             if (!userData) {
                 return res.status(404).send("User not created.")
             }
@@ -61,7 +61,10 @@ export class UserController {
                 token,
                 username: user.username,
                 email: user.email,
-                admin: user.admin || false
+                admin: user.admin || false,
+                addUser: user.addUser || false,
+                addAWSKey: user.addAWSKey || false,
+                addDocument: user.addDocument || false
             });
         } catch (err) {
             next(err);
@@ -103,6 +106,7 @@ export class UserController {
                     admin: true,
                     addUser: true,
                     addAWSKey: true,
+                    addDocument: true,
                 }
             }
 
@@ -183,6 +187,27 @@ export class UserController {
             }
             res.send(userData);
         } catch (err) {
+            next(err);
+        }
+    }
+
+    static async logout(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const userId = req.user._id;
+
+            console.log('[Logout] User ID:', userId);
+
+            const result = await UserService.updateLastLogout(userId);
+
+            console.log('[Logout] Updated user:', result);
+
+            res.send({
+                success: true,
+                message: "Logout successful",
+                timestamp: new Date()
+            });
+        } catch (err) {
+            console.error('[Logout] Error:', err);
             next(err);
         }
     }

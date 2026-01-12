@@ -27,7 +27,8 @@ export class UserDao {
             isActive: payload.isActive  !== undefined ? payload.isActive : user.isActive,
             admin: payload.admin !== undefined ? payload.admin : user.admin,
             addUser: payload.addUser !== undefined ? payload.addUser : user.addUser,
-            addAWSKey: payload.addAWSKey !== undefined ? payload.addAWSKey : user.addAWSKey
+            addAWSKey: payload.addAWSKey !== undefined ? payload.addAWSKey : user.addAWSKey,
+            addDocument: payload.addDocument !== undefined ? payload.addDocument : user.addDocument
         };
 
         // Handle SSO fields
@@ -83,14 +84,19 @@ export class UserDao {
         azureOid: string,
         department?: string,
         jobTitle?: string,
-        ssoProvider: 'azure'
+        ssoProvider: 'azure',
+        admin?: boolean,
+        addUser?: boolean,
+        addAWSKey?: boolean,
+        addDocument?: boolean
     }) {
         return await userModel.create({
             ...payload,
             isActive: true,
-            admin: false,
-            addUser: false,
-            addAWSKey: false,
+            admin: payload.admin || false,
+            addUser: payload.addUser || false,
+            addAWSKey: payload.addAWSKey || false,
+            addDocument: payload.addDocument || false,
             lastLogin: new Date()
         });
     }
@@ -99,6 +105,14 @@ export class UserDao {
         return await userModel.findByIdAndUpdate(
             { _id: userId },
             { $set: { lastLogin: new Date() } },
+            { new: true }
+        ).select("-password");
+    }
+
+    static async updateLastLogout(userId: any) {
+        return await userModel.findByIdAndUpdate(
+            { _id: userId },
+            { $set: { lastLogout: new Date() } },
             { new: true }
         ).select("-password");
     }

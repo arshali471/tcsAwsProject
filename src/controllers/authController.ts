@@ -31,6 +31,12 @@ export class AuthController {
 
             const { azureOid, email, displayName, jobTitle, department } = validation.profile;
 
+            // Fetch user's Azure AD groups
+            const userGroups = await AzureAdService.getUserGroups(accessToken);
+
+            // Check if user belongs to admin group
+            const isAdmin = AzureAdService.isAdminUser(userGroups);
+
             // Check if user exists by Azure OID
             let user = await UserService.getUserByAzureOid(azureOid);
 
@@ -39,18 +45,22 @@ export class AuthController {
                 const existingUser = await UserService.getUserByEmail(email);
 
                 if (existingUser) {
-                    // Link existing account to Azure AD
+                    // Link existing account to Azure AD and update admin status based on group
                     user = await UserService.updateUser(String(existingUser._id), {
                         ssoProvider: 'azure',
                         azureOid,
                         displayName,
                         department,
                         jobTitle,
+                        admin: isAdmin,
+                        addUser: isAdmin,
+                        addAWSKey: isAdmin,
+                        addDocument: isAdmin,
                         lastLogin: new Date()
                     });
-                    console.log(`[Auth] Linked existing user ${email} to Azure AD`);
+                    console.log(`[Auth] Linked existing user ${email} to Azure AD (Admin: ${isAdmin})`);
                 } else {
-                    // Auto-provision new user
+                    // Auto-provision new user with admin access based on AD group
                     const username = email.split('@')[0];
 
                     user = await UserService.createSSOUser({
@@ -60,13 +70,24 @@ export class AuthController {
                         azureOid,
                         department,
                         jobTitle,
-                        ssoProvider: 'azure'
+                        ssoProvider: 'azure',
+                        admin: isAdmin,
+                        addUser: isAdmin,
+                        addAWSKey: isAdmin,
+                        addDocument: isAdmin
                     });
-                    console.log(`[Auth] Auto-provisioned new SSO user: ${email}`);
+                    console.log(`[Auth] Auto-provisioned new SSO user: ${email} (Admin: ${isAdmin})`);
                 }
             } else {
-                // Update last login
-                await UserService.updateLastLogin(String(user._id));
+                // Update last login and admin status (in case group membership changed)
+                await UserService.updateUser(String(user._id), {
+                    admin: isAdmin,
+                    addUser: isAdmin,
+                    addAWSKey: isAdmin,
+                    addDocument: isAdmin,
+                    lastLogin: new Date()
+                });
+                console.log(`[Auth] Updated user ${email} admin status: ${isAdmin}`);
             }
 
             if (!user) {
@@ -85,6 +106,9 @@ export class AuthController {
                 username: user.username,
                 email: user.email,
                 admin: user.admin || false,
+                addUser: user.addUser || false,
+                addAWSKey: user.addAWSKey || false,
+                addDocument: user.addDocument || false,
                 displayName: user.displayName,
                 ssoProvider: 'azure'
             });
