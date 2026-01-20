@@ -5,6 +5,7 @@ import fs from 'fs';
 import { CONFIG } from "./config/environment";
 import "./services/cronJob/fetchInstance.cron";
 import { AzureAdService } from "./services/azureAdService";
+import { initSessionCleanupCron } from "./cron/sessionCleanupCron";
 
 import { Client } from "ssh2";
 import { WebSocketServer } from "ws";
@@ -15,6 +16,9 @@ SERVER.app.set("post", PORT);
 
 // Validate Azure AD configuration
 AzureAdService.validateConfig();
+
+// Initialize session cleanup cron jobs
+initSessionCleanupCron();
 
 const server = http.createServer(SERVER.app);
 

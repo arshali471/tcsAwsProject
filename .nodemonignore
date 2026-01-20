@@ -1,0 +1,13 @@
+uploads/
+uploads/**
+ssh-key/
+ssh-key/**
+agent-status/
+agent-status/**
+build/
+build/**
+node_modules/
+node_modules/**
+.git/
+.git/**
+*.log

@@ -1,6 +1,7 @@
 import express from "express";
 import { UserService } from "../services/userService";
 import { Utility, throwError } from "../util/util";
+import { UserSessionService } from "../services/userSessionService";
 
 
 export class UserController {
@@ -56,6 +57,14 @@ export class UserController {
             await UserService.updateLastLogin(user._id);
 
             let token = Utility.generateJwtToken(user?._id);
+
+            // Create session record
+            try {
+                await UserSessionService.createSession(user, token, req);
+            } catch (sessionError) {
+                console.error('[Login] Error creating session:', sessionError);
+                // Continue with login even if session creation fails
+            }
 
             res.send({
                 token,
@@ -194,12 +203,24 @@ export class UserController {
     static async logout(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
             const userId = req.user._id;
+            const token = req.headers.authorization?.replace('Bearer ', '') || '';
 
             console.log('[Logout] User ID:', userId);
 
             const result = await UserService.updateLastLogout(userId);
 
             console.log('[Logout] Updated user:', result);
+
+            // End session
+            try {
+                if (token) {
+                    await UserSessionService.endSession(token);
+                    console.log('[Logout] Session ended successfully');
+                }
+            } catch (sessionError) {
+                console.error('[Logout] Error ending session:', sessionError);
+                // Continue with logout even if session end fails
+            }
 
             res.send({
                 success: true,
@@ -208,6 +229,45 @@ export class UserController {
             });
         } catch (err) {
             console.error('[Logout] Error:', err);
+            next(err);
+        }
+    }
+
+    /**
+     * Refresh JWT token
+     * POST /api/v1/user/refresh-token
+     */
+    static async refreshToken(
+        req: express.Request,
+        res: express.Response,
+        next: express.NextFunction
+    ) {
+        try {
+            // User is already authenticated via authMiddleware
+            const userId = req.user._id;
+
+            console.log('[RefreshToken] Refreshing token for user:', userId);
+
+            // Generate new token
+            const newToken = Utility.generateJwtToken(String(userId));
+
+            // Update session with new token
+            const oldToken = req.headers.authorization?.replace('Bearer ', '') || '';
+            if (oldToken) {
+                try {
+                    await UserSessionService.updateSessionToken(oldToken, newToken);
+                } catch (sessionError) {
+                    console.error('[RefreshToken] Error updating session:', sessionError);
+                }
+            }
+
+            res.send({
+                success: true,
+                token: newToken,
+                message: 'Token refreshed successfully'
+            });
+        } catch (err) {
+            console.error('[RefreshToken] Error:', err);
             next(err);
         }
     }

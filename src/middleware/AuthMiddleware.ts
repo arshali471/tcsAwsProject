@@ -13,7 +13,10 @@ export function authMiddleware() {
             if (!req.headers.authorization) {
                 return throwError("Invalid token", 400);
             }
-            const decoded: any = jwt.verify(req.headers.authorization, CONFIG.jwt.secret);
+
+            // Strip "Bearer " prefix if present
+            const token = req.headers.authorization.replace('Bearer ', '');
+            const decoded: any = jwt.verify(token, CONFIG.jwt.secret);
             if (!decoded) {
                 // Invalid token
                 return res.status(401).send("Invalid Token")

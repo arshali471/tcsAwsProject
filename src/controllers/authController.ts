@@ -3,6 +3,7 @@ import { AzureAdService } from "../services/azureAdService";
 import { UserService } from "../services/userService";
 import { Utility } from "../util/util";
 import { CONFIG } from "../config/environment";
+import { UserSessionService } from "../services/userSessionService";
 
 export class AuthController {
     /**
@@ -100,6 +101,14 @@ export class AuthController {
 
             // Generate JWT token (same as traditional login)
             const token = Utility.generateJwtToken(String(user._id));
+
+            // Create session record
+            try {
+                await UserSessionService.createSession(user, token, req);
+            } catch (sessionError) {
+                console.error('[Auth] Error creating session:', sessionError);
+                // Continue with login even if session creation fails
+            }
 
             res.send({
                 token,

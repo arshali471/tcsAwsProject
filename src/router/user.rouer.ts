@@ -24,6 +24,7 @@ export default class UserRouter {
         this.router.post("/createUser", userAuthMiddleware(), Validate(UserSchema), UserController.createUser);
         this.router.post("/login", Validate(UserLoginSchema), UserController.login);
         this.router.post("/logout", authMiddleware(), UserController.logout);
+        this.router.post("/refresh-token", authMiddleware(), UserController.refreshToken);
 
         // PUT
         this.router.put("/updateUser/:id", adminAuthMiddleware(), Validate(UserUpdateSchema), UserController.updateUser);

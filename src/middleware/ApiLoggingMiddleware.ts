@@ -105,7 +105,7 @@ function filterSensitiveData(obj: any): any {
     const filtered: any = {};
 
     for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
             const lowerKey = key.toLowerCase();
 
             // Skip sensitive fields
