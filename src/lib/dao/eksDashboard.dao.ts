@@ -61,9 +61,12 @@ export class EksDashboardDao {
             }
         }
 
-        // Step 1: Fetch EKS records (raw)
+        // Step 1: Fetch EKS records (raw) - exclude ymlFileContent for security
         let data: any = await eksDashboardModel
             .find(query)
+            .select('-ymlFileContent')
+            .populate('createdBy', 'username email')
+            .populate('updatedBy', 'username email')
             .skip(skip)
             .limit(limit)
             .sort({ createdAt: -1 });
@@ -73,6 +76,14 @@ export class EksDashboardDao {
             data.map(async (doc: any) => {
                 const obj = doc.toObject();
                 const awsKeyId = obj.awsKeyId?._id || obj.awsKeyId;
+
+                // Preserve the populated createdBy and updatedBy fields
+                const createdBy = obj.createdBy;
+                const updatedBy = obj.updatedBy;
+
+                // CRITICAL: Delete ymlFileContent to prevent it from being sent to frontend
+                delete obj.ymlFileContent;
+                delete obj._ct; // Remove encryption metadata
 
                 if (awsKeyId) {
                     const awsKey = await awsKeysModel.findById({ _id: awsKeyId});
@@ -84,6 +95,10 @@ export class EksDashboardDao {
                         };
                     }
                 }
+
+                // Restore the populated user fields
+                obj.createdBy = createdBy;
+                obj.updatedBy = updatedBy;
 
                 return obj;
             })

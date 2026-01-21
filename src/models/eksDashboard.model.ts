@@ -1,15 +1,13 @@
 import { Schema, model, Document } from "mongoose";
 import mongooseEncryption from "mongoose-encryption";
-import { AWSRegionEnum } from "../lib/enum/awsRegion.enum";
 import { CONFIG } from "../config/environment";
 import { IAWSKey } from "./awsKeys.model";
 
 export interface IEKSDashboard extends Document {
-    awsKeyId: Schema.Types.ObjectId | IAWSKey;
-    token: string;
+    awsKeyId?: Schema.Types.ObjectId | IAWSKey;
     clusterName: string;
-    dashboardUrl: string;
-    monitoringUrl: string;
+    fileName: string;
+    ymlFileContent: string;
     createdBy: Schema.Types.ObjectId;
     updatedBy: Schema.Types.ObjectId;
 }
@@ -19,10 +17,9 @@ const EksDashboardSchema = new Schema<IEKSDashboard>({
         type: Schema.Types.ObjectId,
         ref: "awsKey"
     },
-    token: String,
     clusterName: String,
-    dashboardUrl: String,
-    monitoringUrl: String,
+    fileName: String,
+    ymlFileContent: String,
     createdBy: {
         type: Schema.Types.ObjectId,
         ref: "user"
@@ -49,14 +46,13 @@ EksDashboardSchema.plugin(mongooseEncryption, {
     encryptionKey: encKey,
     signingKey: sigKey,
     encryptedFields: [
-        "token",
-        "dashboardUrl",
-        "monitoringUrl"
+        "ymlFileContent"
     ],
     excludeFromEncryption: [
         "_id",
         "awsKeyId",
         "clusterName",
+        "fileName",
         "createdBy",
         "updatedBy",
         "createdAt",

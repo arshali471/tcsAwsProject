@@ -67,10 +67,8 @@ export class AWSEKSService {
                     nodes: nodesDetails,
                     logging: cluster.logging?.clusterLogging || [],
                     encryption: cluster.encryptionConfig || [],
-                    token: eksToken?.token || "",
-                    connectUrl: eksToken?.dashboardUrl || "",
-                    monitorUrl: eksToken?.monitoringUrl || ""
-
+                    ymlFileContent: eksToken?.ymlFileContent || "",
+                    hasConfig: eksToken ? true : false
                 };
             }));
 
@@ -124,8 +122,6 @@ export class AWSEKSService {
                 } else if (nodesDetails.every(node => node.nodeRole === "Self-managed")) {
                     providerType = "Self-managed";
                 }
-
-                const eksToken = await EksDashboardDao.getEKSToken(clusterName, keyId);
 
                 return {
                     name: cluster.name
