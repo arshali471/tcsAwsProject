@@ -314,9 +314,9 @@ export class FileUploadController {
             conn.on('ready', () => {
                 console.log('[SCP] SSH connection established');
 
-                // Read local file
-                const fileContent = fs.readFileSync(localPath);
-                console.log(`[SCP] Read local file, size: ${fileContent.length} bytes`);
+                // Get file size for logging
+                const stats = fs.statSync(localPath);
+                console.log(`[SCP] Local file size: ${Math.round(stats.size / (1024 * 1024))} MB`);
 
                 // Use SFTP to upload file
                 conn.sftp((err, sftp) => {
@@ -333,14 +333,23 @@ export class FileUploadController {
 
                     console.log(`[SCP] SFTP session created, writing to: ${remotePath}`);
 
-                    // Create write stream
+                    // Use streaming for large files
+                    const readStream = fs.createReadStream(localPath);
                     const writeStream = sftp.createWriteStream(remotePath);
+
+                    let bytesTransferred = 0;
+                    readStream.on('data', (chunk: Buffer) => {
+                        bytesTransferred += chunk.length;
+                        if (bytesTransferred % (50 * 1024 * 1024) === 0) {
+                            console.log(`[SCP] Uploaded ${Math.round(bytesTransferred / (1024 * 1024))} MB`);
+                        }
+                    });
 
                     writeStream.on('close', () => {
                         clearTimeout(timeout);
                         if (!isResolved) {
                             isResolved = true;
-                            console.log('[SCP] File uploaded successfully');
+                            console.log(`[SCP] File uploaded successfully (${Math.round(bytesTransferred / (1024 * 1024))} MB)`);
                             conn.end();
                             resolve({ success: true });
                         }
@@ -356,15 +365,23 @@ export class FileUploadController {
                         }
                     });
 
+                    readStream.on('error', (error: any) => {
+                        clearTimeout(timeout);
+                        if (!isResolved) {
+                            isResolved = true;
+                            console.error('[SCP] Read error:', error);
+                            conn.end();
+                            resolve({ success: false, error: error.message });
+                        }
+                    });
+
                     writeStream.on('finish', () => {
                         console.log('[SCP] Write stream finished');
                     });
 
-                    // Write file content
-                    console.log(`[SCP] Starting write of ${fileContent.length} bytes`);
-                    writeStream.write(fileContent);
-                    writeStream.end();
-                    console.log('[SCP] Write stream ended');
+                    // Pipe read stream to write stream
+                    console.log(`[SCP] Starting streaming upload`);
+                    readStream.pipe(writeStream);
                 });
             });
 
@@ -404,12 +421,9 @@ export class FileUploadController {
                     username,
                     privateKey,
                     port: 22,
-                    readyTimeout: 60000, // 60 seconds to establish connection
-                    keepaliveInterval: 30000, // Send keepalive every 30 seconds
-                    keepaliveCountMax: 20, // Allow 20 missed keepalives (10 minutes total)
-                    debug: (info: string) => {
-                        console.log('[SCP Debug]', info);
-                    }
+                    readyTimeout: 120000, // 2 minutes to establish connection
+                    keepaliveInterval: 10000, // Send keepalive every 10 seconds
+                    keepaliveCountMax: 120 // Allow up to 20 minutes of inactivity (120 * 10s)
                 };
 
                 console.log('[SCP] Attempting connection with config:', {
@@ -648,8 +662,8 @@ export class FileUploadController {
                                 return;
                             }
 
-                            // Parse ls output
-                            const files = FileUploadController.parseListOutput(output);
+                            // Parse ls output with base path for full file paths
+                            const files = FileUploadController.parseListOutput(output, remotePath);
                             resolve({ success: true, files });
                         }
                     });
@@ -689,7 +703,7 @@ export class FileUploadController {
     /**
      * Parse ls -lAh output into structured file objects
      */
-    private static parseListOutput(output: string): any[] {
+    private static parseListOutput(output: string, basePath: string = ''): any[] {
         const lines = output.split('\n').filter(line => line.trim().length > 0);
         const files: any[] = [];
 
@@ -708,8 +722,14 @@ export class FileUploadController {
                 // Skip . and ..
                 if (name === '.' || name === '..') continue;
 
+                // Construct full path
+                const fullPath = basePath.endsWith('/')
+                    ? `${basePath}${name}`
+                    : `${basePath}/${name}`;
+
                 files.push({
                     name,
+                    path: fullPath, // Add full path for file selection
                     type: type === 'd' ? 'directory' : type === 'l' ? 'symlink' : 'file',
                     permissions: type + permissions,
                     owner,
@@ -737,6 +757,15 @@ export class FileUploadController {
     ): Promise<{ success: boolean; error?: string }> {
         return new Promise((resolve) => {
             const conn = new Client();
+            let resolved = false;
+
+            const cleanup = (success: boolean, error?: string) => {
+                if (!resolved) {
+                    resolved = true;
+                    conn.end();
+                    resolve({ success, error });
+                }
+            };
 
             conn.on('ready', () => {
                 console.log('[SCP] SSH connection established for download');
@@ -744,29 +773,33 @@ export class FileUploadController {
                 conn.sftp((err, sftp) => {
                     if (err) {
                         console.error('[SCP] SFTP error:', err);
-                        conn.end();
-                        return resolve({ success: false, error: err.message });
+                        return cleanup(false, err.message);
                     }
 
                     const readStream = sftp.createReadStream(remotePath);
                     const writeStream = fs.createWriteStream(localPath);
 
+                    let bytesTransferred = 0;
+                    readStream.on('data', (chunk: Buffer) => {
+                        bytesTransferred += chunk.length;
+                        if (bytesTransferred % (50 * 1024 * 1024) === 0) {
+                            console.log(`[SCP] Downloaded ${Math.round(bytesTransferred / (1024 * 1024))} MB`);
+                        }
+                    });
+
                     readStream.on('error', (error: any) => {
                         console.error('[SCP] Read error:', error);
-                        conn.end();
-                        resolve({ success: false, error: error.message });
+                        cleanup(false, error.message);
                     });
 
                     writeStream.on('error', (error: any) => {
                         console.error('[SCP] Write error:', error);
-                        conn.end();
-                        resolve({ success: false, error: error.message });
+                        cleanup(false, error.message);
                     });
 
                     writeStream.on('close', () => {
-                        console.log('[SCP] File downloaded successfully');
-                        conn.end();
-                        resolve({ success: true });
+                        console.log(`[SCP] File downloaded successfully (${Math.round(bytesTransferred / (1024 * 1024))} MB)`);
+                        cleanup(true);
                     });
 
                     readStream.pipe(writeStream);
@@ -775,14 +808,622 @@ export class FileUploadController {
 
             conn.on('error', (err) => {
                 console.error('[SCP] Connection error:', err);
-                resolve({ success: false, error: err.message });
+                cleanup(false, err.message);
+            });
+
+            conn.on('timeout', () => {
+                console.error('[SCP] Connection timeout');
+                cleanup(false, 'Connection timeout');
             });
 
             conn.connect({
                 host,
                 username,
-                privateKey
+                privateKey,
+                port: 22,
+                readyTimeout: 120000,
+                keepaliveInterval: 10000,
+                keepaliveCountMax: 120
             });
         });
+    }
+
+    /**
+     * Download a directory from remote server by creating tar.gz archive
+     */
+    private static scpDownloadDirectory(
+        remotePath: string,
+        localArchivePath: string,
+        host: string,
+        username: string,
+        privateKey: string
+    ): Promise<{ success: boolean; error?: string }> {
+        return new Promise((resolve) => {
+            const conn = new Client();
+            const dirName = path.basename(remotePath);
+            const parentDir = path.dirname(remotePath);
+            let resolved = false;
+
+            const cleanup = (success: boolean, error?: string) => {
+                if (!resolved) {
+                    resolved = true;
+                    conn.end();
+                    resolve({ success, error });
+                }
+            };
+
+            conn.on('ready', () => {
+                console.log('[SCP] SSH connection established for directory download');
+
+                // Create tar.gz archive on remote server and download it
+                const tarCommand = `cd ${parentDir} && tar -czf /tmp/${dirName}.tar.gz ${dirName}`;
+
+                conn.exec(tarCommand, (err, stream) => {
+                    if (err) {
+                        console.error('[SCP] Error creating archive:', err);
+                        return cleanup(false, err.message);
+                    }
+
+                    stream.on('close', (code: number) => {
+                        if (code !== 0) {
+                            console.error('[SCP] Archive creation failed with code:', code);
+                            return cleanup(false, `tar command failed with code ${code}`);
+                        }
+
+                        console.log('[SCP] Archive created, downloading...');
+
+                        // Download the archive
+                        conn.sftp((sftpErr, sftp) => {
+                            if (sftpErr) {
+                                console.error('[SCP] SFTP error:', sftpErr);
+                                return cleanup(false, sftpErr.message);
+                            }
+
+                            const remoteArchive = `/tmp/${dirName}.tar.gz`;
+                            const readStream = sftp.createReadStream(remoteArchive);
+                            const writeStream = fs.createWriteStream(localArchivePath);
+
+                            let bytesTransferred = 0;
+                            readStream.on('data', (chunk: Buffer) => {
+                                bytesTransferred += chunk.length;
+                                // Log progress for large files
+                                if (bytesTransferred % (10 * 1024 * 1024) === 0) {
+                                    console.log(`[SCP] Downloaded ${Math.round(bytesTransferred / (1024 * 1024))} MB`);
+                                }
+                            });
+
+                            readStream.on('error', (error: any) => {
+                                console.error('[SCP] Read error:', error);
+                                cleanup(false, error.message);
+                            });
+
+                            writeStream.on('error', (error: any) => {
+                                console.error('[SCP] Write error:', error);
+                                cleanup(false, error.message);
+                            });
+
+                            writeStream.on('close', () => {
+                                console.log(`[SCP] Archive downloaded (${Math.round(bytesTransferred / (1024 * 1024))} MB), cleaning up remote temp file`);
+
+                                // Clean up remote temp archive
+                                conn.exec(`rm -f ${remoteArchive}`, (cleanupErr) => {
+                                    if (cleanupErr) {
+                                        console.warn('[SCP] Failed to cleanup remote archive:', cleanupErr);
+                                    }
+                                    cleanup(true);
+                                });
+                            });
+
+                            readStream.pipe(writeStream);
+                        });
+                    });
+
+                    stream.on('data', (data: Buffer) => {
+                        console.log('[SCP] tar output:', data.toString());
+                    });
+
+                    stream.stderr.on('data', (data: Buffer) => {
+                        console.error('[SCP] tar error:', data.toString());
+                    });
+                });
+            });
+
+            conn.on('error', (err) => {
+                console.error('[SCP] Connection error:', err);
+                cleanup(false, err.message);
+            });
+
+            conn.on('timeout', () => {
+                console.error('[SCP] Connection timeout');
+                cleanup(false, 'Connection timeout');
+            });
+
+            conn.connect({
+                host,
+                username,
+                privateKey,
+                port: 22,
+                readyTimeout: 120000, // 2 minutes for initial connection
+                keepaliveInterval: 10000, // Send keepalive every 10 seconds
+                keepaliveCountMax: 120 // Allow up to 20 minutes of inactivity (120 * 10s)
+            });
+        });
+    }
+
+    /**
+     * Upload a directory to remote server by uploading tar.gz archive and extracting it
+     */
+    private static scpUploadDirectory(
+        localArchivePath: string,
+        remoteTargetPath: string,
+        dirName: string,
+        host: string,
+        username: string,
+        privateKey: string
+    ): Promise<{ success: boolean; error?: string }> {
+        return new Promise((resolve) => {
+            const conn = new Client();
+            const remoteArchive = `/tmp/${path.basename(localArchivePath)}`;
+            let resolved = false;
+
+            const cleanup = (success: boolean, error?: string) => {
+                if (!resolved) {
+                    resolved = true;
+                    conn.end();
+                    resolve({ success, error });
+                }
+            };
+
+            conn.on('ready', () => {
+                console.log('[SCP] SSH connection established for directory upload');
+
+                conn.sftp((err, sftp) => {
+                    if (err) {
+                        console.error('[SCP] SFTP error:', err);
+                        return cleanup(false, err.message);
+                    }
+
+                    console.log('[SCP] Uploading archive to:', remoteArchive);
+
+                    const readStream = fs.createReadStream(localArchivePath);
+                    const writeStream = sftp.createWriteStream(remoteArchive);
+
+                    let bytesTransferred = 0;
+                    readStream.on('data', (chunk: Buffer) => {
+                        bytesTransferred += chunk.length;
+                        // Log progress for large files
+                        if (bytesTransferred % (10 * 1024 * 1024) === 0) {
+                            console.log(`[SCP] Uploaded ${Math.round(bytesTransferred / (1024 * 1024))} MB`);
+                        }
+                    });
+
+                    readStream.on('error', (error: any) => {
+                        console.error('[SCP] Read error:', error);
+                        cleanup(false, error.message);
+                    });
+
+                    writeStream.on('error', (error: any) => {
+                        console.error('[SCP] Write error:', error);
+                        cleanup(false, error.message);
+                    });
+
+                    writeStream.on('close', () => {
+                        console.log(`[SCP] Archive uploaded (${Math.round(bytesTransferred / (1024 * 1024))} MB), extracting to: ${remoteTargetPath}`);
+
+                        // Extract archive on remote server
+                        const extractCommand = `cd ${remoteTargetPath} && tar -xzf ${remoteArchive} && rm -f ${remoteArchive}`;
+
+                        conn.exec(extractCommand, (execErr, stream) => {
+                            if (execErr) {
+                                console.error('[SCP] Error extracting archive:', execErr);
+                                return cleanup(false, execErr.message);
+                            }
+
+                            stream.on('close', (code: number) => {
+                                if (code !== 0) {
+                                    console.error('[SCP] Extraction failed with code:', code);
+                                    return cleanup(false, `tar extraction failed with code ${code}`);
+                                }
+
+                                console.log('[SCP] Directory extracted successfully');
+                                cleanup(true);
+                            });
+
+                            stream.on('data', (data: Buffer) => {
+                                console.log('[SCP] extraction output:', data.toString());
+                            });
+
+                            stream.stderr.on('data', (data: Buffer) => {
+                                console.error('[SCP] extraction error:', data.toString());
+                            });
+                        });
+                    });
+
+                    readStream.pipe(writeStream);
+                });
+            });
+
+            conn.on('error', (err) => {
+                console.error('[SCP] Connection error:', err);
+                cleanup(false, err.message);
+            });
+
+            conn.on('timeout', () => {
+                console.error('[SCP] Connection timeout');
+                cleanup(false, 'Connection timeout');
+            });
+
+            conn.connect({
+                host,
+                username,
+                privateKey,
+                port: 22,
+                readyTimeout: 120000, // 2 minutes for initial connection
+                keepaliveInterval: 10000, // Send keepalive every 10 seconds
+                keepaliveCountMax: 120 // Allow up to 20 minutes of inactivity (120 * 10s)
+            });
+        });
+    }
+
+    /**
+     * Transfer file between two servers using SCP
+     * POST /api/v1/terminal/transfer-file
+     * Body: { sourceIp, sourceUsername, sourceSshKey, sourcePath, targetIp, targetUsername, targetSshKey, targetPath }
+     */
+    static async transferFileBetweenServers(
+        req: express.Request,
+        res: express.Response,
+        next: express.NextFunction
+    ) {
+        try {
+            const {
+                sourceIp,
+                sourceUsername,
+                sourceSshKey,
+                sourcePath,
+                targetIp,
+                targetUsername,
+                targetSshKey,
+                targetPath,
+                isDirectory = false
+            } = req.body;
+
+            console.log('[Transfer] Server-to-server file transfer request:', {
+                source: `${sourceUsername}@${sourceIp}:${sourcePath}`,
+                target: `${targetUsername}@${targetIp}:${targetPath}`,
+                isDirectory,
+                useSourceKeyForTarget: !targetSshKey || targetSshKey === ''
+            });
+
+            if (!sourceIp || !sourceUsername || !sourceSshKey || !sourcePath ||
+                !targetIp || !targetUsername || !targetPath) {
+                return res.status(400).send({
+                    success: false,
+                    message: "Missing required parameters"
+                });
+            }
+
+            // If target SSH key is not provided, use source SSH key
+            const finalTargetSshKey = targetSshKey && targetSshKey.trim() !== '' ? targetSshKey : sourceSshKey;
+            console.log('[Transfer] Using source key for target:', finalTargetSshKey === sourceSshKey);
+
+            const tempDir = path.join(__dirname, "../../uploads/temp-transfers");
+            if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
+            }
+
+            const fileName = path.basename(sourcePath);
+            let tempFilePath: string;
+            let downloadResult: { success: boolean; error?: string };
+            let uploadResult: { success: boolean; error?: string };
+
+            if (isDirectory) {
+                // For directories: create tar.gz archive, transfer, and extract
+                const archiveName = `${fileName}.tar.gz`;
+                tempFilePath = path.join(tempDir, `${Date.now()}-${archiveName}`);
+
+                console.log('[Transfer] Step 1: Creating tar.gz archive of directory on source server');
+
+                // Create archive on source server and download it
+                downloadResult = await FileUploadController.scpDownloadDirectory(
+                    sourcePath,
+                    tempFilePath,
+                    sourceIp,
+                    sourceUsername,
+                    sourceSshKey
+                );
+
+                if (!downloadResult.success) {
+                    return res.status(500).send({
+                        success: false,
+                        message: `Failed to download directory from source server: ${downloadResult.error}`
+                    });
+                }
+
+                console.log('[Transfer] Step 2: Uploading and extracting archive on target server');
+
+                // Upload archive to target server and extract it
+                uploadResult = await FileUploadController.scpUploadDirectory(
+                    tempFilePath,
+                    targetPath,
+                    fileName,
+                    targetIp,
+                    targetUsername,
+                    finalTargetSshKey
+                );
+
+            } else {
+                // For files: direct transfer
+                tempFilePath = path.join(tempDir, `${Date.now()}-${fileName}`);
+
+                console.log('[Transfer] Step 1: Downloading file from source server to temp location:', tempFilePath);
+
+                downloadResult = await FileUploadController.scpDownload(
+                    sourcePath,
+                    tempFilePath,
+                    sourceIp,
+                    sourceUsername,
+                    sourceSshKey
+                );
+
+                if (!downloadResult.success) {
+                    return res.status(500).send({
+                        success: false,
+                        message: `Failed to download from source server: ${downloadResult.error}`
+                    });
+                }
+
+                console.log('[Transfer] Step 2: Uploading file to target server');
+
+                uploadResult = await FileUploadController.scpUpload(
+                    tempFilePath,
+                    path.join(targetPath, fileName),
+                    targetIp,
+                    targetUsername,
+                    finalTargetSshKey
+                );
+            }
+
+            // Step 3: Clean up temporary file/archive
+            try {
+                if (fs.existsSync(tempFilePath)) {
+                    fs.unlinkSync(tempFilePath);
+                    console.log('[Transfer] Cleaned up temporary file');
+                }
+            } catch (cleanupError) {
+                console.error('[Transfer] Failed to clean up temp file:', cleanupError);
+            }
+
+            if (!uploadResult.success) {
+                return res.status(500).send({
+                    success: false,
+                    message: `Failed to upload to target server: ${uploadResult.error}`
+                });
+            }
+
+            console.log(`[Transfer] ${isDirectory ? 'Directory' : 'File'} transfer completed successfully`);
+
+            return res.status(200).send({
+                success: true,
+                message: `${isDirectory ? 'Directory' : 'File'} transferred successfully from ${sourceIp} to ${targetIp}`,
+                fileName: fileName,
+                sourcePath,
+                targetPath: path.join(targetPath, fileName),
+                isDirectory
+            });
+
+        } catch (error: any) {
+            console.error('[Transfer] Error during file transfer:', error);
+            return res.status(500).send({
+                success: false,
+                message: error.message || "File transfer failed"
+            });
+        }
+    }
+
+    /**
+     * Delete file or folder on remote server
+     * POST /api/v1/terminal/delete-file
+     * Body: { ip, username, sshKey, path }
+     */
+    static async deleteFile(
+        req: express.Request,
+        res: express.Response,
+        next: express.NextFunction
+    ) {
+        try {
+            const { ip, username, sshKey, path: filePath } = req.body;
+
+            if (!ip || !username || !sshKey || !filePath) {
+                return res.status(400).send({
+                    success: false,
+                    message: "Missing required fields: ip, username, sshKey, path"
+                });
+            }
+
+            console.log(`[DeleteFile] Deleting file/folder: ${filePath} on ${ip}`);
+
+            const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+                const conn = new Client();
+
+                conn.on('ready', () => {
+                    console.log('[DeleteFile] SSH connection established');
+
+                    // Use rm -rf to delete files and directories
+                    const command = `rm -rf ${filePath}`;
+
+                    conn.exec(command, (err, stream) => {
+                        if (err) {
+                            console.error('[DeleteFile] Exec error:', err);
+                            conn.end();
+                            return resolve({ success: false, error: err.message });
+                        }
+
+                        let errorOutput = '';
+
+                        stream.on('close', (code: number) => {
+                            console.log(`[DeleteFile] Command exited with code: ${code}`);
+                            conn.end();
+
+                            if (code === 0) {
+                                resolve({ success: true });
+                            } else {
+                                resolve({
+                                    success: false,
+                                    error: errorOutput || `Command failed with exit code ${code}`
+                                });
+                            }
+                        });
+
+                        stream.on('data', (data: Buffer) => {
+                            console.log('[DeleteFile] STDOUT:', data.toString());
+                        });
+
+                        stream.stderr.on('data', (data: Buffer) => {
+                            errorOutput += data.toString();
+                            console.error('[DeleteFile] STDERR:', data.toString());
+                        });
+                    });
+                });
+
+                conn.on('error', (err) => {
+                    console.error('[DeleteFile] SSH connection error:', err);
+                    resolve({ success: false, error: err.message });
+                });
+
+                conn.connect({
+                    host: ip,
+                    port: 22,
+                    username: username,
+                    privateKey: sshKey,
+                    readyTimeout: 30000
+                });
+            });
+
+            if (!result.success) {
+                return res.status(500).send({
+                    success: false,
+                    message: `Failed to delete: ${result.error}`
+                });
+            }
+
+            console.log('[DeleteFile] File/folder deleted successfully');
+
+            return res.status(200).send({
+                success: true,
+                message: "File/folder deleted successfully",
+                path: filePath
+            });
+
+        } catch (error: any) {
+            console.error('[DeleteFile] Error during file deletion:', error);
+            return res.status(500).send({
+                success: false,
+                message: error.message || "File deletion failed"
+            });
+        }
+    }
+
+    /**
+     * Create folder on remote server
+     * POST /api/v1/terminal/create-folder
+     * Body: { ip, username, sshKey, path }
+     */
+    static async createFolder(
+        req: express.Request,
+        res: express.Response,
+        next: express.NextFunction
+    ) {
+        try {
+            const { ip, username, sshKey, path: folderPath } = req.body;
+
+            if (!ip || !username || !sshKey || !folderPath) {
+                return res.status(400).send({
+                    success: false,
+                    message: "Missing required fields: ip, username, sshKey, path"
+                });
+            }
+
+            console.log(`[CreateFolder] Creating folder: ${folderPath} on ${ip}`);
+
+            const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+                const conn = new Client();
+
+                conn.on('ready', () => {
+                    console.log('[CreateFolder] SSH connection established');
+
+                    // Use mkdir -p to create folder and parent directories if needed
+                    const command = `mkdir -p ${folderPath}`;
+
+                    conn.exec(command, (err, stream) => {
+                        if (err) {
+                            console.error('[CreateFolder] Exec error:', err);
+                            conn.end();
+                            return resolve({ success: false, error: err.message });
+                        }
+
+                        let errorOutput = '';
+
+                        stream.on('close', (code: number) => {
+                            console.log(`[CreateFolder] Command exited with code: ${code}`);
+                            conn.end();
+
+                            if (code === 0) {
+                                resolve({ success: true });
+                            } else {
+                                resolve({
+                                    success: false,
+                                    error: errorOutput || `Command failed with exit code ${code}`
+                                });
+                            }
+                        });
+
+                        stream.on('data', (data: Buffer) => {
+                            console.log('[CreateFolder] STDOUT:', data.toString());
+                        });
+
+                        stream.stderr.on('data', (data: Buffer) => {
+                            errorOutput += data.toString();
+                            console.error('[CreateFolder] STDERR:', data.toString());
+                        });
+                    });
+                });
+
+                conn.on('error', (err) => {
+                    console.error('[CreateFolder] SSH connection error:', err);
+                    resolve({ success: false, error: err.message });
+                });
+
+                conn.connect({
+                    host: ip,
+                    port: 22,
+                    username: username,
+                    privateKey: sshKey,
+                    readyTimeout: 30000
+                });
+            });
+
+            if (!result.success) {
+                return res.status(500).send({
+                    success: false,
+                    message: `Failed to create folder: ${result.error}`
+                });
+            }
+
+            console.log('[CreateFolder] Folder created successfully');
+
+            return res.status(200).send({
+                success: true,
+                message: "Folder created successfully",
+                path: folderPath
+            });
+
+        } catch (error: any) {
+            console.error('[CreateFolder] Error during folder creation:', error);
+            return res.status(500).send({
+                success: false,
+                message: error.message || "Folder creation failed"
+            });
+        }
     }
 }

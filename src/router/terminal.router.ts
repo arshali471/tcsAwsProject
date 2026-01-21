@@ -45,5 +45,23 @@ export default class TerminalRouter {
             authMiddleware(),
             FileUploadController.listRemoteFiles
         );
+
+        this.router.post(
+            "/transfer-file",
+            authMiddleware(),
+            FileUploadController.transferFileBetweenServers
+        );
+
+        this.router.post(
+            "/delete-file",
+            authMiddleware(),
+            FileUploadController.deleteFile
+        );
+
+        this.router.post(
+            "/create-folder",
+            authMiddleware(),
+            FileUploadController.createFolder
+        );
     }
 }
