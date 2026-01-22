@@ -21,7 +21,7 @@ export class UserSessionService {
             const sessionData = {
                 userId: user._id,
                 username: user.username,
-                email: user.email,
+                email: user.email || user.username, // Fallback to username if email not available
                 token,
                 ipAddress,
                 userAgent,

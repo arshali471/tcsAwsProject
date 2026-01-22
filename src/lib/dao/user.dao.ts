@@ -103,7 +103,7 @@ export class UserDao {
 
     static async updateLastLogin(userId: any) {
         return await userModel.findByIdAndUpdate(
-            { _id: userId },
+            userId,
             { $set: { lastLogin: new Date() } },
             { new: true }
         ).select("-password");
@@ -111,7 +111,7 @@ export class UserDao {
 
     static async updateLastLogout(userId: any) {
         return await userModel.findByIdAndUpdate(
-            { _id: userId },
+            userId,
             { $set: { lastLogout: new Date() } },
             { new: true }
         ).select("-password");

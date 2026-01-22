@@ -38,7 +38,7 @@ const UserSessionSchema = new Schema<IUserSession>({
     },
     email: {
         type: String,
-        required: true
+        required: false // Optional since some users may not have email (e.g., username-only accounts)
     },
     token: {
         type: String,

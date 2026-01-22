@@ -4,7 +4,7 @@
   "ignore": [
     "src/**/*.spec.ts"
   ],
-  "exec": "ts-node --files ./src/index.ts",
+  "exec": "tsx ./src/index.ts",
   "restartable": "rs",
   "env": {
     "NODE_ENV": "development"

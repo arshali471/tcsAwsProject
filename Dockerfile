@@ -33,6 +33,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install only production dependencies
+# Note: MCP packages are ESM and need to be available at runtime
 RUN npm ci --only=production && npm cache clean --force
 
 # Copy built files from builder stage

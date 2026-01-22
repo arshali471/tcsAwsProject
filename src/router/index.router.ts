@@ -8,6 +8,7 @@ import AuthRouter from './auth.router';
 import BedrockUsageRouter from './bedrockUsage.router';
 import UserSessionRouter from './userSession.router';
 import TerminalRouter from './terminal.router';
+import MCPRouter from './mcp.router';
 
 export default class Routes {
 
@@ -40,7 +41,7 @@ export default class Routes {
         server.app.use("/api/v1/bedrock-usage", new BedrockUsageRouter().router);
         server.app.use("/api/v1/sessions", new UserSessionRouter().router);
         server.app.use("/api/v1/terminal", new TerminalRouter().router);
-
+        server.app.use("/api/v1/mcp", new MCPRouter().router);
 
     }
 }
